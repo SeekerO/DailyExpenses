@@ -12,9 +12,9 @@ const PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 if (!SERVICE_ACCOUNT_EMAIL || !PRIVATE_KEY) {
   // NOTE: This will fail the app deployment if the variables are missing.
   // In a real scenario, you might want to handle this more gracefully.
-  throw new Error("Missing Google Service Account environment variables.");
+  throw new Error("Missing Google Service Account environment variables."); // <-- THIS LINE
 }
-//aa
+
 const auth = new google.auth.GoogleAuth({
   credentials: {
     client_email: SERVICE_ACCOUNT_EMAIL,
