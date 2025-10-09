@@ -5,11 +5,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   PhilippinePeso as PesoSign,
-  Clock,
   List,
   CreditCard,
   X,
-  Delete,
   Send,
   Loader2,
   RefreshCw,
@@ -19,10 +17,12 @@ import {
 }
   from 'lucide-react';
 
-
+import TransactionsModal from './lib/components/TransactionModal';
+import SheetIdModal from './lib/components/SheetiIdModal';
+import KeypadButton from './lib/components/KeypadButton';
 
 // --- Type Definitions ---
-interface Expense {
+export interface Expense {
   id: string;
   time_stamp: string;
   category: string;
@@ -87,17 +87,7 @@ const updateOverallMoneyViaAPI = async (sheetId: string, overallMoney: number): 
 // --- Utility Functions ---
 
 /** Converts an ISO string to a localized date/time string. */
-const formatTimestamp = (isoString: string): string => {
-  const date = new Date(isoString);
-  if (isNaN(date.getTime())) return 'Invalid Date';
-  return date.toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
+
 
 // --- App Component ---
 
@@ -129,7 +119,7 @@ const App: React.FC = () => {
   const [isUpdatingOverall, setIsUpdatingOverall] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const CATEGORIES = useMemo(() => ['Groceries', 'Transport', 'Utilities', 'Entertainment', 'Bills', 'Other'], []);
+  const CATEGORIES = useMemo(() => ['Take-out', 'Dine-in', 'Groceries', 'Transport', 'Utilities', 'Entertainment', 'Bills', 'Other', 'Lend'], []);
   const PAYMENT_TYPES = useMemo(() => ['GCASH', 'MAYA', 'Credit', 'Debit'], []);
 
   // --- Sheet ID and Local Storage Logic (FIXED) ---
@@ -339,6 +329,23 @@ const App: React.FC = () => {
     return '';
   }
 
+  const getPaymentClasses = (paymentType: string) => {
+    switch (paymentType) {
+      case 'GCASH':
+        return 'bg-blue-600 text-white border-blue-700 shadow-md hover:bg-blue-500';
+      case 'MAYA':
+        return 'bg-green-700 text-white border-green-800 shadow-md hover:bg-green-600';
+      case 'Credit':
+        return 'bg-purple-600 text-white border-purple-700 shadow-md hover:bg-purple-500';
+      case 'Debit':
+        // Using a distinct dark color for Debit, you can customize this
+        return 'bg-indigo-600 text-white border-indigo-700 shadow-md hover:bg-indigo-500';
+      default:
+        // Fallback for any other specific payment type if you add more
+        return 'bg-indigo-600 text-white border-indigo-700 shadow-md hover:bg-indigo-500';
+    }
+  };
+
   // Show modal if sheet ID is missing
   if (showSheetIdModal || !sheetId) {
     return <SheetIdModal
@@ -351,8 +358,6 @@ const App: React.FC = () => {
 
 
   return (
-    // Base container padding remains p-4, ensuring some space around the content
-    // Dark Mode Background
     <div className="min-h-screen bg-gray-900 flex flex-col items-center p-4">
 
       <header className="w-full max-w-lg mb-6 text-center">
@@ -380,7 +385,15 @@ const App: React.FC = () => {
       {/* Darker background for the main card */}
       <main className="w-full max-w-md bg-gray-800 rounded-xl shadow-2xl p-4 sm:p-6 mb-8">
 
-
+        <div>
+          <button
+            onClick={() => setShowBalance(prev => !prev)}
+            // Dark mode toggle button: darker background, lighter text, darker hover
+            className="mb-4 px-3 py-1 rounded-full text-sm font-medium bg-gray-700 text-indigo-400 hover:bg-gray-600 transition"
+          >
+            {showBalance ? 'Set Money' : 'Show Balance'}
+          </button>
+        </div>
         {!showBalance ?
           <div className="bg-green-950 p-4 rounded-lg shadow-inner mb-6">
             <div className="flex justify-between items-center text-green-300 mb-2">
@@ -508,11 +521,11 @@ const App: React.FC = () => {
                   key={p}
                   onClick={() => setPaymentType(p)}
                   className={`py-2 px-1 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition duration-150 border-2 
-                                        ${paymentType === p
-                      ? 'bg-indigo-600 text-white border-indigo-700 shadow-md' // Selected remains bright
-                      // Dark mode unselected: dark background, lighter text, darker border, darker hover
-                      : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
-                    } `}
+                    ${paymentType === p
+                      ? getPaymentClasses(p) // Selected: Use specific color classes
+                      : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600' // Unselected: Use neutral dark mode style
+                    } 
+                  `}
                 >
                   {p}
                 </button>
@@ -605,187 +618,6 @@ const App: React.FC = () => {
       )}
 
     </div>
-  );
-};
-
-
-// --- NEW Component: TransactionsModal (Dark Mode Updated) ---
-interface TransactionsModalProps {
-  expenses: Expense[];
-  onClose: () => void;
-}
-
-const TransactionsModal: React.FC<TransactionsModalProps> = ({ expenses, onClose }) => {
-  return (
-    // Modal Backdrop - full screen (darker opacity)
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center p-0 sm:p-4 z-50">
-      {/* Modal Content - full width/height on mobile, constrained on sm+ */}
-      {/* Darker modal background */}
-      <div className="bg-gray-800 rounded-none sm:rounded-xl shadow-2xl p-4 sm:p-6 w-full h-full max-h-full sm:max-w-lg sm:h-auto sm:max-h-[90vh] flex flex-col">
-
-        {/* Modal Header */}
-        {/* Lighter header text and darker border */}
-        <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-100 flex items-center">
-            <List className="h-5 w-5 mr-2 text-indigo-400" /> All Recent Transactions
-          </h2>
-          {/* Lighter close button */}
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-200 p-2 rounded-full hover:bg-gray-700 transition">
-            <X className="h-6 w-6" />
-          </button>
-        </div>
-
-        {/* Modal Body (Scrollable List) */}
-        <div className="flex-grow overflow-y-auto">
-          {expenses.length === 0 ? (
-            <p className="p-4 text-gray-400 text-center">No expenses recorded yet.</p>
-          ) : (
-            < ul className="divide-y divide-gray-700">
-              {expenses.map(expense => (
-                <li key={expense.id} className="p-4 hover:bg-gray-700 transition duration-150">
-                  <div className="flex justify-between items-center">
-                    <div className="flex flex-col">
-                      {/* Lighter main text */}
-                      <span className="text-lg font-semibold text-gray-100">
-                        {expense.category}
-                      </span>
-                      {/* Lighter secondary text */}
-                      <span className="text-xs text-gray-400 flex items-center mt-1">
-                        <Clock className="h-3 w-3 mr-1" /> {formatTimestamp(expense.time_stamp)}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      {/* Adjusted red for dark mode */}
-                      <span className="text-xl font-bold text-red-400">
-                        {expense.expense.toFixed(2)}
-                      </span>
-                      <span className="block text-xs text-gray-400 mt-0.5">
-                        {expense.payment}
-                      </span>
-                      {/* Lighter placeholder text */}
-                      <span className="block text-xs font-semibold text-gray-500 mt-0.5">
-                        Sheet Total: {expense.total.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Modal Footer */}
-        {/* Darker border */}
-        <div className="border-t border-gray-700 pt-4 mt-4">
-          {/* Adjusted button color for better dark mode contrast */}
-          <button onClick={onClose} className="w-full py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition">
-            Close
-          </button>
-        </div>
-
-      </div>
-    </div >
-  );
-};
-
-
-// --- SheetIdModal Component (Dark Mode Updated) ---
-interface SheetIdModalProps {
-  onSubmit: (id: string) => void;
-  onClose: () => void;
-  initialSheetId: string;
-  error: string | null;
-}
-
-const SheetIdModal: React.FC<SheetIdModalProps> = ({ onSubmit, onClose, initialSheetId, error }) => {
-  const [input, setInput] = useState(initialSheetId);
-  const canClose = !!initialSheetId;
-
-  return (
-    // Modal Backdrop - full screen
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center p-4 z-50">
-      {/* Modal Content - dark background */}
-      <div className="bg-gray-800 rounded-xl shadow-2xl p-4 sm:p-6 w-full max-w-full sm:max-w-md">
-        {/* Lighter header text and darker border */}
-        <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
-          <h2 className="text-xl font-bold text-indigo-400 flex items-center">
-            <Database className="h-5 w-5 mr-2" /> Google Sheet ID
-          </h2>
-          {canClose && (
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-200">
-              <X className="h-6 w-6" />
-            </button>
-          )}
-        </div>
-
-        {/* Lighter descriptive text */}
-        <p className="text-sm text-gray-400 mb-4">
-          Please enter the ID of your Google Sheet. It will be saved in your {`${"browser's "}`} local storage.
-        </p>
-
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Enter Google Sheet ID here..."
-          // Dark mode input styles
-          className="w-full py-2 px-3 border border-gray-700 bg-gray-700 text-gray-100 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 mb-4"
-        />
-
-        {error && (
-          // Darker error message background, lighter text
-          <div className="mt-2 p-3 bg-red-900 border border-red-700 text-red-300 rounded-lg text-sm mb-4">
-            {error}
-          </div>
-        )}
-
-        {/* Adjusted button color for better dark mode contrast */}
-        <button
-          onClick={() => onSubmit(input.trim())}
-          className="w-full flex items-center justify-center py-3 px-4 rounded-lg text-white font-semibold transition duration-200 bg-indigo-600 hover:bg-indigo-500"
-        >
-          <Save className="h-5 w-5 mr-2" /> Save ID & Load Data
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// --- Keypad Button Component (Dark Mode Updated) ---
-interface KeypadButtonProps {
-  value: string;
-  onClick: (key: string) => void;
-  isUtility?: boolean;
-}
-
-const KeypadButton: React.FC<KeypadButtonProps> = ({ value, onClick }) => {
-  // const isSpecial = value === 'C' || value === 'BACK';
-
-  let content: React.ReactNode;
-  // Reduced font size slightly for better fit on small phones
-  let baseClass = 'rounded-xl p-3 sm:p-4 font-bold text-xl sm:text-2xl transition duration-200 shadow-md active:shadow-none active:translate-y-0.5';
-
-  if (value === 'C') {
-    content = <X className="h-7 w-7 sm:h-8 sm:w-8 mx-auto" />;
-    // Adjusted utility colors for better dark mode visibility
-    baseClass += ' bg-red-900 text-red-300 hover:bg-red-800';
-  } else if (value === 'BACK') {
-    content = <Delete className="h-7 w-7 sm:h-8 sm:w-8 mx-auto" />;
-    // Adjusted utility colors for better dark mode visibility
-    baseClass += ' bg-yellow-900 text-yellow-300 hover:bg-yellow-800';
-  } else {
-    content = value;
-    // Dark mode number keys: dark background, light text, dark hover
-    baseClass += ' bg-gray-700 text-gray-100 hover:bg-gray-600';
-  }
-
-  return (
-    <button
-      onClick={() => onClick(value === 'BACK' ? 'BACK' : value)}
-      className={baseClass}
-    >
-      {content}
-    </button>
   );
 };
 
