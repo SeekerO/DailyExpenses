@@ -14,7 +14,7 @@ if (!SERVICE_ACCOUNT_EMAIL || !PRIVATE_KEY) {
   // In a real scenario, you might want to handle this more gracefully.
   throw new Error("Missing Google Service Account environment variables.");
 }
-
+//aa
 const auth = new google.auth.GoogleAuth({
   credentials: {
     client_email: SERVICE_ACCOUNT_EMAIL,
