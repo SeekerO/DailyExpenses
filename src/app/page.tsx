@@ -9,7 +9,7 @@ import {
   List,
   CreditCard,
   X,
-  ChevronLeft,
+  Delete,
   Send,
   Loader2,
   RefreshCw,
@@ -315,13 +315,15 @@ const App: React.FC = () => {
     }
   };
 
-  // --- Loading and Sheet ID Missing UI (Unchanged) ---
+  // --- Loading and Sheet ID Missing UI (Dark Mode Updated) ---
 
   if (isLoading && sheetId) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <Loader2 className="animate-spin text-indigo-600 h-8 w-8" />
-        <span className="ml-3 text-indigo-600">Loading Live Google Sheet Data via API...</span>
+      // Dark Mode Background
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
+        <Loader2 className="animate-spin text-indigo-400 h-8 w-8" />
+        {/* Lighter text for dark mode */}
+        <span className="ml-3 text-indigo-400">Loading Live Google Sheet Data via API...</span>
       </div>
     );
   }
@@ -347,39 +349,23 @@ const App: React.FC = () => {
 
   return (
     // Base container padding remains p-4, ensuring some space around the content
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center p-4">
-      <style>
-        {/* CSS styles (Unchanged) */}
-        {`
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-                body { font-family: 'Inter', sans-serif; }
-                .input-display:focus {
-                    outline: none;
-                    box-shadow: none;
-                }
-                /* Hide native number input arrows */
-                input[type=number]::-webkit-inner-spin-button, 
-                input[type=number]::-webkit-outer-spin-button { 
-                    -webkit-appearance: none;
-                    margin: 0;
-                }
-                input[type=number] {
-                    -moz-appearance: textfield;
-                }
-                `}
-      </style>
+    // Dark Mode Background
+    <div className="min-h-screen bg-gray-900 flex flex-col items-center p-4">
 
       <header className="w-full max-w-lg mb-6 text-center">
-        <h1 className="text-3xl font-extrabold text-indigo-700 tracking-tight">Daily Expense Log</h1>
-        <p className="text-sm text-gray-500 mt-1 flex justify-center items-center">
-          <span className="font-semibold text-green-600">LIVE DATA: </span>
+        {/* Lighter primary text */}
+        <h1 className="text-3xl font-extrabold text-indigo-400 tracking-tight">Daily Expense Log</h1>
+        {/* Lighter secondary text */}
+        <p className="text-sm text-gray-400 mt-1 flex justify-center items-center">
+          <span className="font-semibold text-green-400">LIVE DATA: </span>
           Connected to secure Back-end API for Google Sheet access.
           <button
             onClick={() => {
               setSubmitError(null);
               setShowSheetIdModal(true);
             }}
-            className="ml-2 p-1 rounded-full text-indigo-500 hover:bg-indigo-100 transition"
+            // Lighter icon color for dark mode
+            className="ml-2 p-1 rounded-full text-indigo-400 hover:bg-gray-700 transition"
             title="Change Sheet ID"
           >
             <Database className="h-4 w-4" />
@@ -388,11 +374,13 @@ const App: React.FC = () => {
       </header>
 
       {/* Main content now uses smaller padding on mobile (p-4) and larger on sm+ (sm:p-6) */}
-      <main className="w-full max-w-lg bg-white rounded-xl shadow-2xl p-4 sm:p-6 mb-8">
+      {/* Darker background for the main card */}
+      <main className="w-full max-w-md bg-gray-800 rounded-xl shadow-2xl p-4 sm:p-6 mb-8">
 
         {/* Overall Starting Money Display & Editor */}
-        <div className="bg-green-50 p-4 rounded-lg shadow-inner mb-6">
-          <div className="flex justify-between items-center text-green-700 mb-2">
+        {/* Slightly darker accent background */}
+        <div className="bg-green-950 p-4 rounded-lg shadow-inner mb-6">
+          <div className="flex justify-between items-center text-green-300 mb-2">
             {/* Reduce text size slightly for better fit on small screens */}
             <span className="text-xs sm:text-sm font-medium uppercase">Overall Starting Money (Sheet F2):</span>
             <span className="text-2xl sm:text-3xl font-bold">
@@ -406,15 +394,16 @@ const App: React.FC = () => {
               value={overallMoneyInput}
               onChange={(e) => setOverallMoneyInput(e.target.value)}
               placeholder="Update starting money"
-              className="w-full py-2 px-3 border border-gray-300 bg-white rounded-l-lg shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-sm"
+              // Dark mode input styles (darker background, lighter text, darker border)
+              className="w-full py-2 px-3 border border-gray-700 bg-gray-700 text-gray-100 rounded-l-lg shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-sm"
               disabled={isUpdatingOverall}
             />
             <button
               onClick={handleUpdateOverallMoney}
               disabled={isUpdatingOverall || overallMoneyInput === overallMoney.toString()}
               className={`flex items-center justify-center py-2 px-4 rounded-r-lg text-white font-semibold transition duration-200 ${isUpdatingOverall || overallMoneyInput === overallMoney.toString()
-                ? 'bg-green-400 cursor-not-allowed'
-                : 'bg-green-600 hover:bg-green-700'
+                ? 'bg-green-700 cursor-not-allowed' // Darker disabled green
+                : 'bg-green-600 hover:bg-green-500' // Adjusted hover for better dark contrast
                 }`}
             >
               {isUpdatingOverall ? (
@@ -427,30 +416,39 @@ const App: React.FC = () => {
         </div>
 
         {/* Overall Deduction and Available Money Summary */}
-        <div className="bg-indigo-50 p-4 rounded-lg shadow-inner mb-6">
-          <h3 className="text-base sm:text-lg font-extrabold text-indigo-800 mb-3 border-b border-indigo-200 pb-2 flex items-center">
+        {/* Slightly darker accent background */}
+        <div className="bg-indigo-950 p-4 rounded-lg shadow-inner mb-6">
+          {/* Lighter header text and border */}
+          <h3 className="text-base sm:text-lg font-extrabold text-indigo-400 mb-3 border-b border-indigo-900 pb-2 flex items-center">
             <PesoSign className="h-5 w-5 mr-2" /> Overall Balance
           </h3>
 
           <div className="flex justify-between items-center py-1">
-            <span className="text-sm sm:text-base font-medium text-gray-700">Overall Starting Money:</span>
-            <span className="text-lg sm:text-xl font-bold text-green-600">
+            {/* Lighter detail text */}
+            <span className="text-sm sm:text-base font-medium text-gray-300">Overall Starting Money:</span>
+            {/* Adjusted green for dark background */}
+            <span className="text-lg sm:text-xl font-bold text-green-400">
               {overallMoney.toFixed(2)}
             </span>
           </div>
 
           <div className="flex justify-between items-center py-1">
-            <span className="text-sm sm:text-base font-medium text-gray-700">Total Deducted (Expenses):</span>
-            <span className="text-lg sm:text-xl font-bold text-red-600">
+            {/* Lighter detail text */}
+            <span className="text-sm sm:text-base font-medium text-gray-300">Total Deducted (Expenses):</span>
+            {/* Adjusted red for dark background */}
+            <span className="text-lg sm:text-xl font-bold text-red-400">
               {totalDeducted.toFixed(2)}
             </span>
           </div>
 
-          <div className="h-px bg-indigo-300 my-2"></div>
+          {/* Darker separator line */}
+          <div className="h-px bg-indigo-900 my-2"></div>
 
           <div className="flex justify-between items-center pt-2">
-            <span className="text-lg sm:text-xl font-bold text-indigo-800">Available Money:</span>
-            <span className={`text-2xl sm:text-3xl font-extrabold ${remainingMoney >= 0 ? 'text-indigo-800' : 'text-red-800'}`}>
+            {/* Lighter key text */}
+            <span className="text-lg sm:text-xl font-bold text-indigo-400">Available Money:</span>
+            {/* Conditional text color, adjusted for dark mode */}
+            <span className={`text-2xl sm:text-3xl font-extrabold ${remainingMoney >= 0 ? 'text-indigo-400' : 'text-red-400'}`}>
               {remainingMoney.toFixed(2)}
             </span>
           </div>
@@ -458,16 +456,18 @@ const App: React.FC = () => {
 
         {/* Input Area */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Expense Amount</label>
+          {/* Lighter label text */}
+          <label className="block text-sm font-medium text-gray-300 mb-2">Expense Amount</label>
           <div className="relative">
+            {/* Lighter icon color */}
             <PesoSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
               value={currentInput}
               readOnly
               inputMode="none"
-              // Adjusted font size to fit better on small screens (text-3xl on mobile, text-4xl on sm+)
-              className="input-display w-full text-right pr-4 py-3 pl-10 text-3xl sm:text-4xl font-light tracking-wide border border-indigo-200 rounded-xl transition duration-150 bg-white text-gray-800 focus:ring-2 focus:ring-indigo-500"
+              // Dark mode input: darker border, dark background, lighter text
+              className="input-display w-full text-right pr-4 py-3 pl-10 text-3xl sm:text-4xl font-light tracking-wide border border-indigo-900 rounded-xl transition duration-150 bg-gray-700 text-gray-100 focus:ring-2 focus:ring-indigo-500"
             />
           </div>
         </div>
@@ -476,25 +476,28 @@ const App: React.FC = () => {
         <div className="grid grid-cols-1 gap-4 mb-6">
           {/* Category Dropdown (Unchanged grid) */}
           <div>
-            <label htmlFor="category" className="flex items-center text-sm font-medium text-gray-700 mb-1">
-              <List className="h-4 w-4 mr-1 text-indigo-500" /> Category
+            {/* Lighter label text and icon color */}
+            <label htmlFor="category" className="flex items-center text-sm font-medium text-gray-300 mb-1">
+              <List className="h-4 w-4 mr-1 text-indigo-400" /> Category
             </label>
             <select
               id="category"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full py-2 px-3 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+              // Dark mode select styles: darker border, dark background, lighter text
+              className="w-full py-2 px-3 border border-gray-700 bg-gray-700 text-gray-100 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm"
             >
               {CATEGORIES.map(c => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c} className="bg-gray-700 text-gray-100">{c}</option>
               ))}
             </select>
           </div>
 
           {/* Payment Type Grid (Already grid-cols-4, which should be fine) */}
           <div>
-            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-              <CreditCard className="h-4 w-4 mr-1 text-indigo-500" /> Payment Type
+            {/* Lighter label text and icon color */}
+            <label className="flex items-center text-sm font-medium text-gray-300 mb-1">
+              <CreditCard className="h-4 w-4 mr-1 text-indigo-400" /> Payment Type
             </label>
             <div className="grid grid-cols-4 gap-2">
               {PAYMENT_TYPES.map(p => (
@@ -503,8 +506,9 @@ const App: React.FC = () => {
                   onClick={() => setPaymentType(p)}
                   className={`py-2 px-1 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition duration-150 border-2 
                                         ${paymentType === p
-                      ? 'bg-indigo-600 text-white border-indigo-700 shadow-md'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      ? 'bg-indigo-600 text-white border-indigo-700 shadow-md' // Selected remains bright
+                      // Dark mode unselected: dark background, lighter text, darker border, darker hover
+                      : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
                     } `}
                 >
                   {p}
@@ -516,6 +520,7 @@ const App: React.FC = () => {
 
         {/* Custom Keypad & Submit Button (Keypad buttons use p-4, which is okay) */}
         <div className="grid grid-cols-4 gap-2 mb-4">
+          {/* KeypadButton component handles dark mode internally */}
           {['7', '8', '9', 'C'].map(key => (
             <KeypadButton key={key} value={key} onClick={handleKey} isUtility={key !== 'C'} />
           ))}
@@ -532,8 +537,8 @@ const App: React.FC = () => {
             onClick={handleSubmitExpense}
             disabled={isSubmitting || isUpdatingOverall}
             className={`col-span-2 flex items-center justify-center rounded-xl p-4 text-white font-semibold transition duration-200 shadow-lg ${isSubmitting || isUpdatingOverall
-              ? 'bg-indigo-400 cursor-not-allowed'
-              : 'bg-indigo-600 hover:bg-indigo-700 active:shadow-none active:translate-y-0.5'
+              ? 'bg-indigo-800 cursor-not-allowed' // Darker disabled blue
+              : 'bg-indigo-600 hover:bg-indigo-500 active:shadow-none active:translate-y-0.5' // Adjusted hover for better dark contrast
               }`}
           >
             {isSubmitting ? (
@@ -549,7 +554,8 @@ const App: React.FC = () => {
         {/* View Transactions Button */}
         <button
           onClick={() => setShowTransactionsModal(true)}
-          className="w-full flex items-center justify-center rounded-lg p-3 text-sm font-semibold transition duration-200 border bg-indigo-600 text-white hover:bg-indigo-700 mt-4 shadow-md hover:shadow-lg"
+          // Adjusted color for dark mode main action
+          className="w-full flex items-center justify-center rounded-lg p-3 text-sm font-semibold transition duration-200 border bg-indigo-600 text-white hover:bg-indigo-500 mt-4 shadow-md hover:shadow-lg"
         >
           <Eye className="h-4 w-4 mr-2" /> View All {expenseHistory.length} Transactions
         </button>
@@ -558,9 +564,10 @@ const App: React.FC = () => {
         <button
           onClick={loadExpenses}
           disabled={isLoading || isSubmitting || isUpdatingOverall}
+          // Dark mode refresh button: darker background, lighter text/icon, darker hover
           className={`w-full flex items-center justify-center rounded-lg p-3 text-sm font-semibold transition duration-200 border ${isLoading || isSubmitting || isUpdatingOverall
-            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-            : 'bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50'
+            ? 'bg-gray-800 text-gray-500 cursor-not-allowed border-gray-700'
+            : 'bg-gray-700 text-indigo-400 border-indigo-900 hover:bg-gray-600'
             } mt-2`}
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -569,7 +576,8 @@ const App: React.FC = () => {
 
         {/* Submission Error Message */}
         {submitError && (
-          <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center">
+          // Darker error message background, lighter text
+          <div className="mt-4 p-3 bg-red-900 border border-red-700 text-red-300 rounded-lg flex items-center">
             <X className="h-5 w-5 mr-2" />
             <p className="text-sm">{submitError}</p>
           </div>
@@ -598,7 +606,7 @@ const App: React.FC = () => {
 };
 
 
-// --- NEW Component: TransactionsModal (Responsive Styles Applied) ---
+// --- NEW Component: TransactionsModal (Dark Mode Updated) ---
 interface TransactionsModalProps {
   expenses: Expense[];
   onClose: () => void;
@@ -606,17 +614,20 @@ interface TransactionsModalProps {
 
 const TransactionsModal: React.FC<TransactionsModalProps> = ({ expenses, onClose }) => {
   return (
-    // Modal Backdrop - full screen
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-0 sm:p-4 z-50">
+    // Modal Backdrop - full screen (darker opacity)
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center p-0 sm:p-4 z-50">
       {/* Modal Content - full width/height on mobile, constrained on sm+ */}
-      <div className="bg-white rounded-none sm:rounded-xl shadow-2xl p-4 sm:p-6 w-full h-full max-h-full sm:max-w-lg sm:h-auto sm:max-h-[90vh] flex flex-col">
+      {/* Darker modal background */}
+      <div className="bg-gray-800 rounded-none sm:rounded-xl shadow-2xl p-4 sm:p-6 w-full h-full max-h-full sm:max-w-lg sm:h-auto sm:max-h-[90vh] flex flex-col">
 
         {/* Modal Header */}
-        <div className="flex justify-between items-center mb-4 border-b pb-2">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center">
-            <List className="h-5 w-5 mr-2 text-indigo-600" /> All Recent Transactions
+        {/* Lighter header text and darker border */}
+        <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-100 flex items-center">
+            <List className="h-5 w-5 mr-2 text-indigo-400" /> All Recent Transactions
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition">
+          {/* Lighter close button */}
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-200 p-2 rounded-full hover:bg-gray-700 transition">
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -624,28 +635,32 @@ const TransactionsModal: React.FC<TransactionsModalProps> = ({ expenses, onClose
         {/* Modal Body (Scrollable List) */}
         <div className="flex-grow overflow-y-auto">
           {expenses.length === 0 ? (
-            <p className="p-4 text-gray-500 text-center">No expenses recorded yet.</p>
+            <p className="p-4 text-gray-400 text-center">No expenses recorded yet.</p>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            < ul className="divide-y divide-gray-700">
               {expenses.map(expense => (
-                <li key={expense.id} className="p-4 hover:bg-indigo-50 transition duration-150">
+                <li key={expense.id} className="p-4 hover:bg-gray-700 transition duration-150">
                   <div className="flex justify-between items-center">
                     <div className="flex flex-col">
-                      <span className="text-lg font-semibold text-gray-800">
+                      {/* Lighter main text */}
+                      <span className="text-lg font-semibold text-gray-100">
                         {expense.category}
                       </span>
-                      <span className="text-xs text-gray-500 flex items-center mt-1">
+                      {/* Lighter secondary text */}
+                      <span className="text-xs text-gray-400 flex items-center mt-1">
                         <Clock className="h-3 w-3 mr-1" /> {formatTimestamp(expense.time_stamp)}
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-xl font-bold text-red-600">
+                      {/* Adjusted red for dark mode */}
+                      <span className="text-xl font-bold text-red-400">
                         {expense.expense.toFixed(2)}
                       </span>
-                      <span className="block text-xs text-gray-500 mt-0.5">
+                      <span className="block text-xs text-gray-400 mt-0.5">
                         {expense.payment}
                       </span>
-                      <span className="block text-xs font-semibold text-gray-400 mt-0.5">
+                      {/* Lighter placeholder text */}
+                      <span className="block text-xs font-semibold text-gray-500 mt-0.5">
                         Sheet Total: {expense.total.toFixed(2)}
                       </span>
                     </div>
@@ -657,19 +672,21 @@ const TransactionsModal: React.FC<TransactionsModalProps> = ({ expenses, onClose
         </div>
 
         {/* Modal Footer */}
-        <div className="border-t pt-4 mt-4">
-          <button onClick={onClose} className="w-full py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition">
+        {/* Darker border */}
+        <div className="border-t border-gray-700 pt-4 mt-4">
+          {/* Adjusted button color for better dark mode contrast */}
+          <button onClick={onClose} className="w-full py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition">
             Close
           </button>
         </div>
 
       </div>
-    </div>
+    </div >
   );
 };
 
 
-// --- SheetIdModal Component (Responsive Styles Applied) ---
+// --- SheetIdModal Component (Dark Mode Updated) ---
 interface SheetIdModalProps {
   onSubmit: (id: string) => void;
   onClose: () => void;
@@ -683,21 +700,23 @@ const SheetIdModal: React.FC<SheetIdModalProps> = ({ onSubmit, onClose, initialS
 
   return (
     // Modal Backdrop - full screen
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50">
-      {/* Modal Content - mobile p-4, sm:p-6, max-w-full on mobile, then max-w-md */}
-      <div className="bg-white rounded-xl shadow-2xl p-4 sm:p-6 w-full max-w-full sm:max-w-md">
-        <div className="flex justify-between items-center mb-4 border-b pb-2">
-          <h2 className="text-xl font-bold text-indigo-700 flex items-center">
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center p-4 z-50">
+      {/* Modal Content - dark background */}
+      <div className="bg-gray-800 rounded-xl shadow-2xl p-4 sm:p-6 w-full max-w-full sm:max-w-md">
+        {/* Lighter header text and darker border */}
+        <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+          <h2 className="text-xl font-bold text-indigo-400 flex items-center">
             <Database className="h-5 w-5 mr-2" /> Google Sheet ID
           </h2>
           {canClose && (
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-200">
               <X className="h-6 w-6" />
             </button>
           )}
         </div>
 
-        <p className="text-sm text-gray-600 mb-4">
+        {/* Lighter descriptive text */}
+        <p className="text-sm text-gray-400 mb-4">
           Please enter the ID of your Google Sheet. It will be saved in your {`${"browser's "}`} local storage.
         </p>
 
@@ -706,18 +725,21 @@ const SheetIdModal: React.FC<SheetIdModalProps> = ({ onSubmit, onClose, initialS
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Enter Google Sheet ID here..."
-          className="w-full py-2 px-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 mb-4"
+          // Dark mode input styles
+          className="w-full py-2 px-3 border border-gray-700 bg-gray-700 text-gray-100 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 mb-4"
         />
 
         {error && (
-          <div className="mt-2 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm mb-4">
+          // Darker error message background, lighter text
+          <div className="mt-2 p-3 bg-red-900 border border-red-700 text-red-300 rounded-lg text-sm mb-4">
             {error}
           </div>
         )}
 
+        {/* Adjusted button color for better dark mode contrast */}
         <button
           onClick={() => onSubmit(input.trim())}
-          className="w-full flex items-center justify-center py-3 px-4 rounded-lg text-white font-semibold transition duration-200 bg-indigo-600 hover:bg-indigo-700"
+          className="w-full flex items-center justify-center py-3 px-4 rounded-lg text-white font-semibold transition duration-200 bg-indigo-600 hover:bg-indigo-500"
         >
           <Save className="h-5 w-5 mr-2" /> Save ID & Load Data
         </button>
@@ -726,8 +748,7 @@ const SheetIdModal: React.FC<SheetIdModalProps> = ({ onSubmit, onClose, initialS
   );
 };
 
-// Not worki
-// --- Keypad Button Component (Unchanged) ---
+// --- Keypad Button Component (Dark Mode Updated) ---
 interface KeypadButtonProps {
   value: string;
   onClick: (key: string) => void;
@@ -743,13 +764,16 @@ const KeypadButton: React.FC<KeypadButtonProps> = ({ value, onClick }) => {
 
   if (value === 'C') {
     content = <X className="h-7 w-7 sm:h-8 sm:w-8 mx-auto" />;
-    baseClass += ' bg-red-100 text-red-600 hover:bg-red-200';
+    // Adjusted utility colors for better dark mode visibility
+    baseClass += ' bg-red-900 text-red-300 hover:bg-red-800';
   } else if (value === 'BACK') {
-    content = <ChevronLeft className="h-7 w-7 sm:h-8 sm:w-8 mx-auto" />;
-    baseClass += ' bg-yellow-100 text-yellow-600 hover:bg-yellow-200';
+    content = <Delete className="h-7 w-7 sm:h-8 sm:w-8 mx-auto" />;
+    // Adjusted utility colors for better dark mode visibility
+    baseClass += ' bg-yellow-900 text-yellow-300 hover:bg-yellow-800';
   } else {
     content = value;
-    baseClass += ' bg-gray-100 text-gray-800 hover:bg-gray-200';
+    // Dark mode number keys: dark background, light text, dark hover
+    baseClass += ' bg-gray-700 text-gray-100 hover:bg-gray-600';
   }
 
   return (
