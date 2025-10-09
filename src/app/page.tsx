@@ -1,5 +1,7 @@
 'use client'
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   PhilippinePeso as PesoSign,
@@ -16,6 +18,8 @@ import {
   Eye, // Icon for viewing transactions
 }
   from 'lucide-react';
+
+
 
 // --- Type Definitions ---
 interface Expense {
@@ -36,7 +40,7 @@ const fetchExpenses = async (sheetId: string): Promise<{ expenses: Expense[], ov
   if (!response.ok) {
     throw new Error(`Failed to fetch expenses from API. Status: ${response.status}`);
   }
-  const data: { expenses: any[], overallMoney: any } = await response.json();
+  const data: { expenses: [], overallMoney: any } = await response.json();
 
   const expenses: Expense[] = data.expenses.map((item: any) => ({
     ...item,
@@ -218,7 +222,7 @@ const App: React.FC = () => {
         return prev + '.';
       }
 
-      let next = prev === '0' ? key : prev + key;
+      const next = prev === '0' ? key : prev + key;
 
       const decimalIndex = next.indexOf('.');
       if (decimalIndex !== -1 && next.length > decimalIndex + 3) {
@@ -676,7 +680,7 @@ const SheetIdModal: React.FC<SheetIdModalProps> = ({ onSubmit, onClose, initialS
         </div>
 
         <p className="text-sm text-gray-600 mb-4">
-          Please enter the ID of your Google Sheet. It will be saved in your browser's local storage.
+          Please enter the ID of your Google Sheet. It will be saved in your {`${"browser's "}`} local storage.
         </p>
 
         <input
