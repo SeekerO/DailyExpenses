@@ -111,6 +111,7 @@ const App: React.FC = () => {
   // State for Transactions Modal
   const [showTransactionsModal, setShowTransactionsModal] = useState(false);
 
+  // Initial state for isLoading should be true
   const [isLoading, setIsLoading] = useState(true);
   const [currentInput, setCurrentInput] = useState('0');
   const [category, setCategory] = useState('Groceries');
@@ -128,20 +129,29 @@ const App: React.FC = () => {
   const CATEGORIES = useMemo(() => ['Groceries', 'Transport', 'Utilities', 'Entertainment', 'Bills', 'Other'], []);
   const PAYMENT_TYPES = useMemo(() => ['GCASH', 'MAYA', 'Credit', 'Debit'], []);
 
-  // --- Sheet ID and Local Storage Logic (Unchanged) ---
+  // --- Sheet ID and Local Storage Logic (FIXED) ---
   useEffect(() => {
-    const savedSheetId = localStorage.getItem('googleSheetId');
-    if (savedSheetId) {
-      setSheetId(savedSheetId);
-    } else {
-      setShowSheetIdModal(true);
-      setIsLoading(false);
+    // Check for client environment before accessing localStorage
+    if (typeof window !== 'undefined') {
+      const savedSheetId = localStorage.getItem('googleSheetId');
+      if (savedSheetId) {
+        setSheetId(savedSheetId);
+      } else {
+        // If no ID is found, stop loading and show the modal
+        setShowSheetIdModal(true);
+        setIsLoading(false);
+      }
     }
+    // Note: If running on server (typeof window is undefined), isLoading remains true, 
+    // waiting for the client-side render to run this effect.
   }, []);
 
   const handleSetSheetId = (id: string) => {
     if (id) {
-      localStorage.setItem('googleSheetId', id);
+      // Check for client environment before accessing localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('googleSheetId', id);
+      }
       setSheetId(id);
       setShowSheetIdModal(false);
       if (!isLoading) {
@@ -316,12 +326,20 @@ const App: React.FC = () => {
     );
   }
 
+  // Helper function to safely get sheet ID from local storage for modals
+  const getInitialSheetId = () => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('googleSheetId') || '';
+    }
+    return '';
+  }
+
   // Show modal if sheet ID is missing
   if (showSheetIdModal || !sheetId) {
     return <SheetIdModal
       onSubmit={handleSetSheetId}
       onClose={() => setShowSheetIdModal(false)}
-      initialSheetId={localStorage.getItem('googleSheetId') || ''}
+      initialSheetId={getInitialSheetId()}
       error={submitError}
     />
   }
@@ -378,7 +396,7 @@ const App: React.FC = () => {
             {/* Reduce text size slightly for better fit on small screens */}
             <span className="text-xs sm:text-sm font-medium uppercase">Overall Starting Money (Sheet F2):</span>
             <span className="text-2xl sm:text-3xl font-bold">
-              ₱{overallMoney.toFixed(2)}
+              {overallMoney.toFixed(2)}
             </span>
           </div>
 
@@ -417,14 +435,14 @@ const App: React.FC = () => {
           <div className="flex justify-between items-center py-1">
             <span className="text-sm sm:text-base font-medium text-gray-700">Overall Starting Money:</span>
             <span className="text-lg sm:text-xl font-bold text-green-600">
-              + ₱{overallMoney.toFixed(2)}
+              {overallMoney.toFixed(2)}
             </span>
           </div>
 
           <div className="flex justify-between items-center py-1">
             <span className="text-sm sm:text-base font-medium text-gray-700">Total Deducted (Expenses):</span>
             <span className="text-lg sm:text-xl font-bold text-red-600">
-              - ₱{totalDeducted.toFixed(2)}
+              {totalDeducted.toFixed(2)}
             </span>
           </div>
 
@@ -433,7 +451,7 @@ const App: React.FC = () => {
           <div className="flex justify-between items-center pt-2">
             <span className="text-lg sm:text-xl font-bold text-indigo-800">Available Money:</span>
             <span className={`text-2xl sm:text-3xl font-extrabold ${remainingMoney >= 0 ? 'text-indigo-800' : 'text-red-800'}`}>
-              ₱{remainingMoney.toFixed(2)}
+              {remainingMoney.toFixed(2)}
             </span>
           </div>
         </div>
@@ -563,7 +581,7 @@ const App: React.FC = () => {
         <SheetIdModal
           onSubmit={handleSetSheetId}
           onClose={() => setShowSheetIdModal(false)}
-          initialSheetId={localStorage.getItem('googleSheetId') || ''}
+          initialSheetId={getInitialSheetId()}
           error={submitError}
         />
       )}
@@ -622,7 +640,7 @@ const TransactionsModal: React.FC<TransactionsModalProps> = ({ expenses, onClose
                     </div>
                     <div className="text-right">
                       <span className="text-xl font-bold text-red-600">
-                        -₱{expense.expense.toFixed(2)}
+                        {expense.expense.toFixed(2)}
                       </span>
                       <span className="block text-xs text-gray-500 mt-0.5">
                         {expense.payment}
