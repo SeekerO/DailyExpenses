@@ -111,6 +111,9 @@ const App: React.FC = () => {
   // State for Transactions Modal
   const [showTransactionsModal, setShowTransactionsModal] = useState(false);
 
+  // State for Balance
+  const [showBalance, setShowBalance] = useState(true);
+
   // Initial state for isLoading should be true
   const [isLoading, setIsLoading] = useState(true);
   const [currentInput, setCurrentInput] = useState('0');
@@ -377,82 +380,82 @@ const App: React.FC = () => {
       {/* Darker background for the main card */}
       <main className="w-full max-w-md bg-gray-800 rounded-xl shadow-2xl p-4 sm:p-6 mb-8">
 
-        {/* Overall Starting Money Display & Editor */}
-        {/* Slightly darker accent background */}
-        <div className="bg-green-950 p-4 rounded-lg shadow-inner mb-6">
-          <div className="flex justify-between items-center text-green-300 mb-2">
-            {/* Reduce text size slightly for better fit on small screens */}
-            <span className="text-xs sm:text-sm font-medium uppercase">Overall Starting Money (Sheet F2):</span>
-            <span className="text-2xl sm:text-3xl font-bold">
+
+        {!showBalance ?
+          <div className="bg-green-950 p-4 rounded-lg shadow-inner mb-6">
+            <div className="flex justify-between items-center text-green-300 mb-2">
+              {/* Reduce text size slightly for better fit on small screens */}
+              <span className="text-xs sm:text-sm font-medium uppercase">Overall Starting Money (Sheet F2):</span>
+              {/* <span className="text-2xl sm:text-3xl font-bold">
               {overallMoney.toFixed(2)}
-            </span>
+            </span> */}
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="number"
+                value={overallMoneyInput}
+                onChange={(e) => setOverallMoneyInput(e.target.value)}
+                placeholder="Update starting money"
+                // Dark mode input styles (darker background, lighter text, darker border)
+                className="w-full py-2 px-3 border border-gray-700 bg-gray-700 text-gray-100 rounded-l-lg shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-sm"
+                disabled={isUpdatingOverall}
+              />
+              <button
+                onClick={handleUpdateOverallMoney}
+                disabled={isUpdatingOverall || overallMoneyInput === overallMoney.toString()}
+                className={`flex items-center justify-center py-2 px-4 rounded-r-lg text-white font-semibold transition duration-200 ${isUpdatingOverall || overallMoneyInput === overallMoney.toString()
+                  ? 'bg-green-700 cursor-not-allowed' // Darker disabled green
+                  : 'bg-green-600 hover:bg-green-500' // Adjusted hover for better dark contrast
+                  }`}
+              >
+                {isUpdatingOverall ? (
+                  <Loader2 className="animate-spin h-5 w-5" />
+                ) : (
+                  <Save className="h-5 w-5" />
+                )}
+              </button>
+            </div>
           </div>
+          :
+          <div className="bg-indigo-950 p-4 rounded-lg shadow-inner mb-6">
+            {/* Lighter header text and border */}
+            <h3 className="text-base sm:text-md font-extrabold text-indigo-400 mb-3 border-b border-indigo-900 pb-2 flex items-center">
+              <PesoSign className="h-5 w-5 mr-2" /> Overall Balance
+            </h3>
 
-          <div className="flex items-center">
-            <input
-              type="number"
-              value={overallMoneyInput}
-              onChange={(e) => setOverallMoneyInput(e.target.value)}
-              placeholder="Update starting money"
-              // Dark mode input styles (darker background, lighter text, darker border)
-              className="w-full py-2 px-3 border border-gray-700 bg-gray-700 text-gray-100 rounded-l-lg shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-sm"
-              disabled={isUpdatingOverall}
-            />
-            <button
-              onClick={handleUpdateOverallMoney}
-              disabled={isUpdatingOverall || overallMoneyInput === overallMoney.toString()}
-              className={`flex items-center justify-center py-2 px-4 rounded-r-lg text-white font-semibold transition duration-200 ${isUpdatingOverall || overallMoneyInput === overallMoney.toString()
-                ? 'bg-green-700 cursor-not-allowed' // Darker disabled green
-                : 'bg-green-600 hover:bg-green-500' // Adjusted hover for better dark contrast
-                }`}
-            >
-              {isUpdatingOverall ? (
-                <Loader2 className="animate-spin h-5 w-5" />
-              ) : (
-                <Save className="h-5 w-5" />
-              )}
-            </button>
+            <div className="flex justify-between items-center py-1">
+              {/* Lighter detail text */}
+              <span className="text-sm sm:text-base font-medium text-gray-300">Overall Starting Money:</span>
+              {/* Adjusted green for dark background */}
+              <span className="text-md sm:text-lg font-bold text-green-400">
+                {overallMoney.toFixed(2)}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center py-1">
+              {/* Lighter detail text */}
+              <span className="text-sm sm:text-base font-medium text-gray-300">Total Deducted (Expenses):</span>
+              {/* Adjusted red for dark background */}
+              <span className="text-lg sm:text-xl font-bold text-red-400">
+                {totalDeducted.toFixed(2)}
+              </span>
+            </div>
+
+            {/* Darker separator line */}
+            <div className="h-px bg-indigo-900 my-2"></div>
+
+            <div className="flex justify-between items-center pt-2">
+              {/* Lighter key text */}
+              <span className="text-lg sm:text-md font-bold text-indigo-400">Available Money:</span>
+              {/* Conditional text color, adjusted for dark mode */}
+              <span className={`text-xl sm:text-lg font-extrabold ${remainingMoney >= 0 ? 'text-indigo-400' : 'text-red-400'}`}>
+                {remainingMoney.toFixed(2)}
+              </span>
+            </div>
           </div>
-        </div>
+        }
 
-        {/* Overall Deduction and Available Money Summary */}
-        {/* Slightly darker accent background */}
-        <div className="bg-indigo-950 p-4 rounded-lg shadow-inner mb-6">
-          {/* Lighter header text and border */}
-          <h3 className="text-base sm:text-lg font-extrabold text-indigo-400 mb-3 border-b border-indigo-900 pb-2 flex items-center">
-            <PesoSign className="h-5 w-5 mr-2" /> Overall Balance
-          </h3>
-
-          <div className="flex justify-between items-center py-1">
-            {/* Lighter detail text */}
-            <span className="text-sm sm:text-base font-medium text-gray-300">Overall Starting Money:</span>
-            {/* Adjusted green for dark background */}
-            <span className="text-lg sm:text-xl font-bold text-green-400">
-              {overallMoney.toFixed(2)}
-            </span>
-          </div>
-
-          <div className="flex justify-between items-center py-1">
-            {/* Lighter detail text */}
-            <span className="text-sm sm:text-base font-medium text-gray-300">Total Deducted (Expenses):</span>
-            {/* Adjusted red for dark background */}
-            <span className="text-lg sm:text-xl font-bold text-red-400">
-              {totalDeducted.toFixed(2)}
-            </span>
-          </div>
-
-          {/* Darker separator line */}
-          <div className="h-px bg-indigo-900 my-2"></div>
-
-          <div className="flex justify-between items-center pt-2">
-            {/* Lighter key text */}
-            <span className="text-lg sm:text-xl font-bold text-indigo-400">Available Money:</span>
-            {/* Conditional text color, adjusted for dark mode */}
-            <span className={`text-2xl sm:text-3xl font-extrabold ${remainingMoney >= 0 ? 'text-indigo-400' : 'text-red-400'}`}>
-              {remainingMoney.toFixed(2)}
-            </span>
-          </div>
-        </div>
 
         {/* Input Area */}
         <div className="mb-6">
