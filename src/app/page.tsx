@@ -715,8 +715,8 @@ interface KeypadButtonProps {
   isUtility?: boolean;
 }
 
-const KeypadButton: React.FC<KeypadButtonProps> = ({ value, onClick, isUtility }) => {
-  const isSpecial = value === 'C' || value === 'BACK';
+const KeypadButton: React.FC<KeypadButtonProps> = ({ value, onClick }) => {
+  // const isSpecial = value === 'C' || value === 'BACK';
 
   let content: React.ReactNode;
   // Reduced font size slightly for better fit on small phones
