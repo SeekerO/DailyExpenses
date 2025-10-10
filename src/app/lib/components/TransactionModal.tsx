@@ -8,7 +8,9 @@ import {
     Clapperboard,
     Receipt,
     Tag,
-    LucideIcon
+    LucideIcon,
+    Plus,
+    Minus
 } from 'lucide-react';
 import formatTimestamp from '../util/formatTimestamp';
 
@@ -89,15 +91,11 @@ const TransactionsModal: React.FC<TransactionsModalProps> = ({ expenses, onClose
                                         </div>
                                         <div className="text-right">
                                             {/* Adjusted red for dark mode */}
-                                            <span className="text-xl font-bold text-red-400">
-                                                {expense.expense.toFixed(2)}
+                                            <span className={`${expense.category.toLocaleLowerCase().includes("salary") || expense.category.toLocaleLowerCase().includes("allowance") ? 'text-green-400' : 'text-red-400'} text-lg font-bold flex items-center justify-end`}>
+                                                {expense.category.toLocaleLowerCase().includes("salary") || expense.category.toLocaleLowerCase().includes("allowance") ? <Plus size={10} /> : <Minus size={10} />} {expense.expense.toFixed(2)}
                                             </span>
                                             <span className="block text-xs text-gray-400 mt-0.5">
                                                 {expense.payment}
-                                            </span>
-                                            {/* Lighter placeholder text */}
-                                            <span className="block text-xs font-semibold text-gray-500 mt-0.5">
-                                                Sheet Total: {expense.total.toFixed(2)}
                                             </span>
                                         </div>
                                     </div>

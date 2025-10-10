@@ -86,25 +86,22 @@ export async function GET(request: Request) {
       );
     }
 
-    // NEW: Extract overall_money from F2 (rows[1][5] assuming F is the 6th column, index 5)
-    // The image shows 50649 in E2, but the header is 'overall_money' in F1.
-    // I will assume overall_money is in F2 (rows[1][5]) for the new feature.
-    // However, since EXPENSE_RANGE is A:F, rows[0] is the header.
-    // The expense data starts at row 2 (index 1 in the array).
-    // The value in F2 is at rows[1][5].
     const overallMoneyRaw = rows[1]?.[5] || 0;
     const overallMoney = parseFloat(overallMoneyRaw.toString()) || 0;
+    const totalExpense = rows[1]?.[4] || 0;
 
     // The first row is usually the header, so we slice it off.
     const expenseRows = rows.slice(1);
 
     // Filter out rows that might be empty due to range (A:F) extending past data
     const expenses: ExpenseRecord[] = expenseRows
-      .filter((row) => row.length > 0 && row[0]) // Ensure row is not empty and time_stamp (A) exists
+      .filter((row) => row.length > 0 && row[0])
       .map(mapSheetRowToExpense);
 
-    // Return both expenses and the overall_money
-    return NextResponse.json({ expenses, overallMoney }, { status: 200 });
+    return NextResponse.json(
+      { expenses, overallMoney, totalExpense },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Google Sheets GET Error:", error);
     // Returning the error message to help with debugging

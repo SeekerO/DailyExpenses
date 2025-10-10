@@ -14,6 +14,8 @@ import {
   Database, // Icon for sheet ID
   Save, // Icon for overall money save
   Eye, // Icon for viewing transactions
+  EyeOff,
+  Wallet, // New icon for Income
 }
   from 'lucide-react';
 
@@ -27,15 +29,18 @@ export interface Expense {
   time_stamp: string;
   category: string;
   payment: string;
+  // NOTE: This expense property will now store the amount, 
+  // which will be positive for expenses and positive for income 
+  // in the local state, but the API logic will determine its sign/impact.
   expense: number;
   total: number;
   userId: string;
 }
 
-// --- API Service Functions (Unchanged) ---
+// --- API Service Functions (Modified for Income Type) ---
 const MOCK_USER_ID = 'live-sheet-user-5000';
 
-const fetchExpenses = async (sheetId: string): Promise<{ expenses: Expense[], overallMoney: number }> => {
+const fetchExpenses = async (sheetId: string): Promise<{ expenses: Expense[], overallMoney: number, data: any }> => {
   const response = await fetch(`/api/expenses?sheetId=${sheetId}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch expenses from API. Status: ${response.status}`);
@@ -48,26 +53,33 @@ const fetchExpenses = async (sheetId: string): Promise<{ expenses: Expense[], ov
     total: parseFloat(item.total)
   }));
 
+
   const overallMoney: number = parseFloat(data.overallMoney) || 0;
 
-  return { expenses, overallMoney };
+  return { expenses, overallMoney, data };
 };
 
-const saveExpenseViaAPI = async (sheetId: string, newExpense: Omit<Expense, 'id' | 'total'>): Promise<void> => {
+// MODIFIED: Added type property (expense or income) to the payload
+const saveExpenseOrIncomeViaAPI = async (
+  sheetId: string,
+  newTransaction: Omit<Expense, 'id' | 'total'> & { type: 'expense' | 'income' }
+): Promise<void> => {
+  // Assume the API endpoint remains the same, but it now handles a 'type' property
   const response = await fetch('/api/expenses', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ ...newExpense, sheetId }),
+    body: JSON.stringify({ ...newTransaction, sheetId }),
   });
 
   if (!response.ok) {
     const errorDetail = await response.text();
-    throw new Error(`Failed to save expense: ${response.status} - ${errorDetail}`);
+    throw new Error(`Failed to save transaction: ${response.status} - ${errorDetail}`);
   }
 };
 
+// This function handles the "starting money" update as requested
 const updateOverallMoneyViaAPI = async (sheetId: string, overallMoney: number): Promise<void> => {
   const response = await fetch('/api/expenses', {
     method: 'PATCH',
@@ -84,11 +96,6 @@ const updateOverallMoneyViaAPI = async (sheetId: string, overallMoney: number): 
 };
 
 
-// --- Utility Functions ---
-
-/** Converts an ISO string to a localized date/time string. */
-
-
 // --- App Component ---
 
 const App: React.FC = () => {
@@ -102,25 +109,42 @@ const App: React.FC = () => {
   const [showTransactionsModal, setShowTransactionsModal] = useState(false);
 
   // State for Balance
-  const [showBalance, setShowBalance] = useState(true);
+  const [showBalance, setShowBalance] = useState<boolean | null>(true);
+
+  // State for Layout Balance Toggle
+  const [showLayoutBalance, setShowLayoutBalance] = useState(false);
 
   // Initial state for isLoading should be true
   const [isLoading, setIsLoading] = useState(true);
   const [currentInput, setCurrentInput] = useState('0');
+
+  // MODIFIED: Default category/payment for expense/income
   const [category, setCategory] = useState('Groceries');
-  const [paymentType, setPaymentType] = useState('Gcash');
+  const [paymentType, setPaymentType] = useState('GCASH/MAYA');
+  const [transactionType, setTransactionType] = useState<'expense' | 'income'>('expense'); // NEW STATE
   const [expenseHistory, setExpenseHistory] = useState<Expense[]>([]);
 
   // State for Overall Money
   const [overallMoney, setOverallMoney] = useState(0);
   const [overallMoneyInput, setOverallMoneyInput] = useState('');
+  const [totalExpense, setTotalExpense] = useState(0)
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUpdatingOverall, setIsUpdatingOverall] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const CATEGORIES = useMemo(() => ['Take-out', 'Dine-in', 'Groceries', 'Transport', 'Utilities', 'Entertainment', 'Bills', 'Other', 'Lend'], []);
-  const PAYMENT_TYPES = useMemo(() => ['GCASH', 'MAYA', 'Credit', 'Debit'], []);
+  // MODIFIED CATEGORIES: Added Income option
+  const EXPENSE_CATEGORIES = useMemo(() => ['Take-out', 'Dine-in', 'Groceries', 'Transport', 'Utilities', 'Entertainment', 'Bills', 'Other', 'Lend'], []);
+  const INCOME_CATEGORIES = useMemo(() => ['Salary', 'Allowance', 'Other Income'], []); // NEW INCOME CATEGORIES
+
+  // MODIFIED PAYMENT_TYPES: Separated for clarity, and added Salary/Allowance as requested
+  const EXPENSE_PAYMENT_TYPES = useMemo(() => ['GCASH/MAYA', 'CASH', 'Credit', 'Debit'], []);
+  const INCOME_PAYMENT_TYPES = useMemo(() => ['Salary', 'Allowance'], []); // NEW INCOME PAYMENT TYPES
+
+  // Conditional Categories and Payment Types based on transaction type
+  const CURRENT_CATEGORIES = transactionType === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+  const CURRENT_PAYMENT_TYPES = transactionType === 'expense' ? EXPENSE_PAYMENT_TYPES : INCOME_PAYMENT_TYPES;
+
 
   // --- Sheet ID and Local Storage Logic (FIXED) ---
   useEffect(() => {
@@ -135,8 +159,6 @@ const App: React.FC = () => {
         setIsLoading(false);
       }
     }
-    // Note: If running on server (typeof window is undefined), isLoading remains true, 
-    // waiting for the client-side render to run this effect.
   }, []);
 
   const handleSetSheetId = (id: string) => {
@@ -167,12 +189,14 @@ const App: React.FC = () => {
     setIsLoading(true);
     setSubmitError(null);
     try {
-      const { expenses, overallMoney: loadedOverallMoney } = await fetchExpenses(sheetId);
+      const { expenses, overallMoney: loadedOverallMoney, data } = await fetchExpenses(sheetId);
 
       expenses.sort((a, b) => new Date(b.time_stamp).getTime() - new Date(a.time_stamp).getTime());
+      const convertToFloat = parseFloat(data.totalExpense)
       setExpenseHistory(expenses);
       setOverallMoney(loadedOverallMoney);
       setOverallMoneyInput(loadedOverallMoney.toString());
+      setTotalExpense(convertToFloat)
 
     } catch (e) {
       console.error("Error fetching live sheet data:", e);
@@ -189,26 +213,29 @@ const App: React.FC = () => {
     }
   }, [sheetId, loadExpenses]);
 
-  // Calculate total expenses and remaining money (Unchanged)
-  const { totalExpenses } = useMemo(() => {
-    let total = 0;
-    expenseHistory.forEach(e => {
-      total += e.expense;
-    });
-    return {
-      totalExpenses: total
-    };
-  }, [expenseHistory]);
+
+  // // MODIFIED: Calculate total expenses, total income, and remaining money
+  // const { totalExpenses } = useMemo(() => {
+  //   let expenses = 0;
+  //   // We assume expenseHistory from the API only contains expense entries
+  //   expenseHistory.forEach(e => {
+  //     expenses += e.expense;
+  //   });
+
+  //   return {
+  //     totalExpenses: expenses,
+  //   };
+  // }, [expenseHistory]);
 
   const { remainingMoney, totalDeducted } = useMemo(() => {
-    const deducted = totalExpenses;
+    const deducted = totalExpense;
     const remaining = overallMoney - deducted;
 
     return {
       remainingMoney: remaining,
       totalDeducted: deducted,
     };
-  }, [overallMoney, totalExpenses]);
+  }, [overallMoney, totalExpense]);
 
 
   // --- Keypad Logic (Unchanged) ---
@@ -238,8 +265,26 @@ const App: React.FC = () => {
     });
   }, []);
 
-  // --- Expense Submission (Unchanged logic) ---
-  const handleSubmitExpense = async () => {
+  // NEW: Handler to toggle transaction type and reset category/payment
+  const handleTransactionTypeToggle = (type: 'expense' | 'income') => {
+    setTransactionType(type);
+    setCurrentInput('0');
+    setSubmitError(null);
+
+    // Reset category/payment based on the new type
+    if (type === 'expense') {
+      setCategory(EXPENSE_CATEGORIES[0]);
+      setPaymentType(EXPENSE_PAYMENT_TYPES[0]);
+    } else {
+      // Set to Salary or Allowance as they are the new main choices for income
+      setCategory(INCOME_CATEGORIES[0]); // Defaults to 'Salary'
+      setPaymentType(INCOME_PAYMENT_TYPES[0]); // Defaults to 'Salary'
+    }
+  }
+
+
+  // MODIFIED: Consolidated submission logic for both Expense and Income
+  const handleSubmitTransaction = async () => {
     if (!sheetId) {
       setSubmitError("Please set the Google Sheet ID first.");
       setShowSheetIdModal(true);
@@ -248,37 +293,62 @@ const App: React.FC = () => {
 
     const amount = parseFloat(currentInput);
     if (isNaN(amount) || amount <= 0) {
-      setSubmitError("Please enter a valid expense amount.");
+      setSubmitError(`Please enter a valid ${transactionType} amount.`);
       return;
     }
 
     setIsSubmitting(true);
     setSubmitError(null);
 
-    const newExpense: Omit<Expense, 'id' | 'total'> = {
+    const newTransaction: Omit<Expense, 'id' | 'total'> & { type: 'expense' | 'income' } = {
       time_stamp: new Date().toISOString(),
       category: category,
       payment: paymentType,
-      expense: amount,
+      expense: amount, // The API will handle the sign based on 'type'
       userId: userId,
+      type: transactionType, // NEW PROPERTY
     };
 
     try {
-      await saveExpenseViaAPI(sheetId, newExpense);
+      // Log the transaction type to the console as requested by the user's intent to "log it when I added money"
+      console.log(`Submitting ${transactionType.toUpperCase()} with details:`, {
+        amount: amount,
+        category: category,
+        payment: paymentType
+      });
+
+      await saveExpenseOrIncomeViaAPI(sheetId, newTransaction); // MODIFIED API CALL
+
+      // --- NEW LOGIC: Conditional PATCH for Overall Money (F2) when logging Income ---
+      if (transactionType === 'income') {
+        // Calculate the new overall money by adding the income amount
+        const newOverallMoney = overallMoney + amount;
+
+        // Explicitly call the PATCH API to update cell F2
+        await updateOverallMoneyViaAPI(sheetId, newOverallMoney);
+
+        // Update local state immediately (optional, loadExpenses will confirm)
+        setOverallMoney(newOverallMoney);
+        setOverallMoneyInput(newOverallMoney.toString());
+      }
+      // --- END NEW LOGIC ---
+
+      // Reload all data to refresh transactions, total expense, and confirm F2 (if not updated above)
       await loadExpenses();
 
       setCurrentInput('0');
-      setCategory(CATEGORIES[0]);
+
+      // Keep the current category/payment type for the user's next log (convenience)
 
     } catch (e) {
-      console.error("Error saving to live sheet: ", e);
-      setSubmitError((e as Error).message || "Failed to save expense. Please check network.");
+      console.error(`Error saving ${transactionType} to live sheet: `, e);
+      setSubmitError((e as Error).message || `Failed to save ${transactionType}. Please check network.`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // --- Overall Money Update Handler (Unchanged logic) ---
+  // --- Overall Money Update Handler (Starting Money Function) ---
   const handleUpdateOverallMoney = async () => {
     if (!sheetId) {
       setSubmitError("Please set the Google Sheet ID first.");
@@ -308,7 +378,40 @@ const App: React.FC = () => {
     }
   };
 
-  // --- Loading and Sheet ID Missing UI (Dark Mode Updated) ---
+  // --- Utility functions for UI ---
+
+  const getInitialSheetId = () => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('googleSheetId') || '';
+    }
+    return '';
+  }
+
+  const getPaymentClasses = (paymentType: string) => {
+    switch (paymentType) {
+      case 'GCASH/MAYA':
+        return 'bg-blue-600 text-white border-blue-700 shadow-md hover:bg-blue-500';
+      case 'CASH':
+        return 'bg-green-700 text-white border-green-800 shadow-md hover:bg-green-600';
+      case 'Credit':
+        return 'bg-purple-600 text-white border-purple-700 shadow-md hover:bg-purple-500';
+      case 'Debit':
+        return 'bg-indigo-600 text-white border-indigo-700 shadow-md hover:bg-indigo-500';
+      // NEW: Income Types (Salary/Allowance)
+      case 'Salary':
+        return 'bg-emerald-600 text-white border-emerald-700 shadow-md hover:bg-emerald-500';
+      case 'Allowance':
+        return 'bg-cyan-600 text-white border-cyan-700 shadow-md hover:bg-cyan-500';
+      default:
+        return 'bg-indigo-600 text-white border-indigo-700 shadow-md hover:bg-indigo-500';
+    }
+  };
+
+  const handleSHowBalanceLayoutToggle = () => {
+    setShowBalance(!showBalance)
+  }
+
+  // --- Main Render Logic ---
 
   if (isLoading && sheetId) {
     return (
@@ -320,31 +423,6 @@ const App: React.FC = () => {
       </div>
     );
   }
-
-  // Helper function to safely get sheet ID from local storage for modals
-  const getInitialSheetId = () => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('googleSheetId') || '';
-    }
-    return '';
-  }
-
-  const getPaymentClasses = (paymentType: string) => {
-    switch (paymentType) {
-      case 'GCASH':
-        return 'bg-blue-600 text-white border-blue-700 shadow-md hover:bg-blue-500';
-      case 'MAYA':
-        return 'bg-green-700 text-white border-green-800 shadow-md hover:bg-green-600';
-      case 'Credit':
-        return 'bg-purple-600 text-white border-purple-700 shadow-md hover:bg-purple-500';
-      case 'Debit':
-        // Using a distinct dark color for Debit, you can customize this
-        return 'bg-indigo-600 text-white border-indigo-700 shadow-md hover:bg-indigo-500';
-      default:
-        // Fallback for any other specific payment type if you add more
-        return 'bg-indigo-600 text-white border-indigo-700 shadow-md hover:bg-indigo-500';
-    }
-  };
 
   // Show modal if sheet ID is missing
   if (showSheetIdModal || !sheetId) {
@@ -361,9 +439,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gray-900 flex flex-col items-center p-4">
 
       <header className="w-full max-w-lg mb-6 text-center">
-        {/* Lighter primary text */}
-        <h1 className="text-3xl font-extrabold text-indigo-400 tracking-tight">Daily Expense Log</h1>
-        {/* Lighter secondary text */}
+        <h1 className="text-3xl font-extrabold text-indigo-400 tracking-tight">Daily Financial Log</h1>
         <p className="text-sm text-gray-400 mt-1 flex justify-center items-center">
           <span className="font-semibold text-green-400">LIVE DATA: </span>
           Connected to secure Back-end API for Google Sheet access.
@@ -372,7 +448,6 @@ const App: React.FC = () => {
               setSubmitError(null);
               setShowSheetIdModal(true);
             }}
-            // Lighter icon color for dark mode
             className="ml-2 p-1 rounded-full text-indigo-400 hover:bg-gray-700 transition"
             title="Change Sheet ID"
           >
@@ -381,108 +456,127 @@ const App: React.FC = () => {
         </p>
       </header>
 
-      {/* Main content now uses smaller padding on mobile (p-4) and larger on sm+ (sm:p-6) */}
-      {/* Darker background for the main card */}
       <main className="w-full max-w-md bg-gray-800 rounded-xl shadow-2xl p-4 sm:p-6 mb-8">
 
-        <div>
-          <button
-            onClick={() => setShowBalance(prev => !prev)}
-            // Dark mode toggle button: darker background, lighter text, darker hover
-            className="mb-4 px-3 py-1 rounded-full text-sm font-medium bg-gray-700 text-indigo-400 hover:bg-gray-600 transition"
+        <div className='w-full relative flex items-center gap-3 mb-4'>
+          <button onClick={() => setShowLayoutBalance(!showLayoutBalance)} className=' text-white'>
+            {showLayoutBalance ? <EyeOff /> : <Eye />}
+          </button>
+
+          {showLayoutBalance && <button
+            onClick={() => handleSHowBalanceLayoutToggle()}
+            className=" px-3 py-1 rounded-full text-sm font-medium bg-gray-700 text-indigo-400 hover:bg-gray-600 transition"
           >
             {showBalance ? 'Set Money' : 'Show Balance'}
+          </button>}
+
+        </div>
+
+        {/* --- Overall Money/Balance Section --- */}
+        {showLayoutBalance && <>
+          {!showBalance && showBalance !== null ?
+            // UI for modifying starting money (OverallMoneyInput)
+            <div className="bg-green-950 p-4 rounded-lg shadow-inner mb-6">
+              <div className="flex justify-between items-center text-green-300 mb-2">
+                <span className="text-xs sm:text-sm font-medium uppercase">Overall Starting Money (Sheet F2):</span>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="number"
+                  value={overallMoneyInput}
+                  onChange={(e) => setOverallMoneyInput(e.target.value)}
+                  placeholder="Update starting money"
+                  className="w-full py-2 px-3 border border-gray-700 bg-gray-700 text-gray-100 rounded-l-lg shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-sm"
+                  disabled={isUpdatingOverall}
+                />
+                <button
+                  onClick={handleUpdateOverallMoney}
+                  disabled={isUpdatingOverall || overallMoneyInput === overallMoney.toString()}
+                  className={`flex items-center justify-center py-2 px-4 rounded-r-lg text-white font-semibold transition duration-200 ${isUpdatingOverall || overallMoneyInput === overallMoney.toString()
+                    ? 'bg-green-700 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-500'
+                    }`}
+                >
+                  {isUpdatingOverall ? (
+                    <Loader2 className="animate-spin h-5 w-5" />
+                  ) : (
+                    <Save className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+            </div>
+            :
+            // UI for displaying balance
+            <div className="bg-indigo-950 p-4 rounded-lg shadow-inner mb-6">
+              <h3 className="text-base sm:text-md font-extrabold text-indigo-400 mb-3 border-b border-indigo-900 pb-2 flex items-center">
+                <PesoSign className="h-5 w-5 mr-2" /> Overall Balance
+              </h3>
+
+              <div className="flex justify-between items-center py-1">
+                <span className="text-sm sm:text-base font-medium text-gray-300">Overall Starting Money:</span>
+                <span className="text-md sm:text-lg font-bold text-green-400">
+                  {overallMoney.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-1">
+                <span className="text-sm sm:text-base font-medium text-gray-300">Total Deducted (Expenses):</span>
+                <span className="text-lg sm:text-xl font-bold text-red-400">
+                  {totalDeducted.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="h-px bg-indigo-900 my-2"></div>
+
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-lg sm:text-md font-bold text-indigo-400">Available Money:</span>
+                <span className={`text-xl sm:text-lg font-extrabold ${remainingMoney >= 0 ? 'text-indigo-400' : 'text-red-400'}`}>
+                  {remainingMoney.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          }
+        </>}
+
+        {/* NEW: Transaction Type Toggle (Expense or Income) */}
+        <div className='flex justify-center gap-3 mb-6'>
+          <button
+            onClick={() => handleTransactionTypeToggle('expense')}
+            className={`py-2 px-4 rounded-lg font-semibold transition duration-200 flex items-center ${transactionType === 'expense'
+              ? 'bg-red-600 text-white hover:bg-red-500'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+          >
+            <Send className="h-5 w-5 mr-2" /> Log Expense
+          </button>
+          <button
+            onClick={() => handleTransactionTypeToggle('income')}
+            className={`py-2 px-4 rounded-lg font-semibold transition duration-200 flex items-center ${transactionType === 'income'
+              ? 'bg-green-600 text-white hover:bg-green-500'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+          >
+            <Wallet className="h-5 w-5 mr-2" /> Log Income
           </button>
         </div>
-        {!showBalance ?
-          <div className="bg-green-950 p-4 rounded-lg shadow-inner mb-6">
-            <div className="flex justify-between items-center text-green-300 mb-2">
-              {/* Reduce text size slightly for better fit on small screens */}
-              <span className="text-xs sm:text-sm font-medium uppercase">Overall Starting Money (Sheet F2):</span>
-              {/* <span className="text-2xl sm:text-3xl font-bold">
-              {overallMoney.toFixed(2)}
-            </span> */}
-            </div>
-
-            <div className="flex items-center">
-              <input
-                type="number"
-                value={overallMoneyInput}
-                onChange={(e) => setOverallMoneyInput(e.target.value)}
-                placeholder="Update starting money"
-                // Dark mode input styles (darker background, lighter text, darker border)
-                className="w-full py-2 px-3 border border-gray-700 bg-gray-700 text-gray-100 rounded-l-lg shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-sm"
-                disabled={isUpdatingOverall}
-              />
-              <button
-                onClick={handleUpdateOverallMoney}
-                disabled={isUpdatingOverall || overallMoneyInput === overallMoney.toString()}
-                className={`flex items-center justify-center py-2 px-4 rounded-r-lg text-white font-semibold transition duration-200 ${isUpdatingOverall || overallMoneyInput === overallMoney.toString()
-                  ? 'bg-green-700 cursor-not-allowed' // Darker disabled green
-                  : 'bg-green-600 hover:bg-green-500' // Adjusted hover for better dark contrast
-                  }`}
-              >
-                {isUpdatingOverall ? (
-                  <Loader2 className="animate-spin h-5 w-5" />
-                ) : (
-                  <Save className="h-5 w-5" />
-                )}
-              </button>
-            </div>
-          </div>
-          :
-          <div className="bg-indigo-950 p-4 rounded-lg shadow-inner mb-6">
-            {/* Lighter header text and border */}
-            <h3 className="text-base sm:text-md font-extrabold text-indigo-400 mb-3 border-b border-indigo-900 pb-2 flex items-center">
-              <PesoSign className="h-5 w-5 mr-2" /> Overall Balance
-            </h3>
-
-            <div className="flex justify-between items-center py-1">
-              {/* Lighter detail text */}
-              <span className="text-sm sm:text-base font-medium text-gray-300">Overall Starting Money:</span>
-              {/* Adjusted green for dark background */}
-              <span className="text-md sm:text-lg font-bold text-green-400">
-                {overallMoney.toFixed(2)}
-              </span>
-            </div>
-
-            <div className="flex justify-between items-center py-1">
-              {/* Lighter detail text */}
-              <span className="text-sm sm:text-base font-medium text-gray-300">Total Deducted (Expenses):</span>
-              {/* Adjusted red for dark background */}
-              <span className="text-lg sm:text-xl font-bold text-red-400">
-                {totalDeducted.toFixed(2)}
-              </span>
-            </div>
-
-            {/* Darker separator line */}
-            <div className="h-px bg-indigo-900 my-2"></div>
-
-            <div className="flex justify-between items-center pt-2">
-              {/* Lighter key text */}
-              <span className="text-lg sm:text-md font-bold text-indigo-400">Available Money:</span>
-              {/* Conditional text color, adjusted for dark mode */}
-              <span className={`text-xl sm:text-lg font-extrabold ${remainingMoney >= 0 ? 'text-indigo-400' : 'text-red-400'}`}>
-                {remainingMoney.toFixed(2)}
-              </span>
-            </div>
-          </div>
-        }
 
 
         {/* Input Area */}
         <div className="mb-6">
-          {/* Lighter label text */}
-          <label className="block text-sm font-medium text-gray-300 mb-2">Expense Amount</label>
+          <div className='flex items-center mb-2 gap-5'>
+            <label className="block text-sm font-medium text-gray-300 ">
+              {transactionType === 'expense' ? 'Expense Amount' : 'Income Amount'}
+            </label>
+          </div>
           <div className="relative">
-            {/* Lighter icon color */}
+            <label className='text-[11px] text-gray-500 absolute left-4 bottom-1'>Available Balance:    ₱{remainingMoney.toFixed(2)}</label>
             <PesoSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
               value={currentInput}
               readOnly
               inputMode="none"
-              // Dark mode input: darker border, dark background, lighter text
               className="input-display w-full text-right pr-4 py-3 pl-10 text-3xl sm:text-4xl font-light tracking-wide border border-indigo-900 rounded-xl transition duration-150 bg-gray-700 text-gray-100 focus:ring-2 focus:ring-indigo-500"
             />
           </div>
@@ -490,9 +584,8 @@ const App: React.FC = () => {
 
         {/* Categories and Payment */}
         <div className="grid grid-cols-1 gap-4 mb-6">
-          {/* Category Dropdown (Unchanged grid) */}
+          {/* Category Dropdown (Uses CURRENT_CATEGORIES) */}
           <div>
-            {/* Lighter label text and icon color */}
             <label htmlFor="category" className="flex items-center text-sm font-medium text-gray-300 mb-1">
               <List className="h-4 w-4 mr-1 text-indigo-400" /> Category
             </label>
@@ -500,30 +593,28 @@ const App: React.FC = () => {
               id="category"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              // Dark mode select styles: darker border, dark background, lighter text
               className="w-full py-2 px-3 border border-gray-700 bg-gray-700 text-gray-100 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm"
             >
-              {CATEGORIES.map(c => (
+              {CURRENT_CATEGORIES.map(c => (
                 <option key={c} value={c} className="bg-gray-700 text-gray-100">{c}</option>
               ))}
             </select>
           </div>
 
-          {/* Payment Type Grid (Already grid-cols-4, which should be fine) */}
+          {/* Payment Type Grid (Uses CURRENT_PAYMENT_TYPES) */}
           <div>
-            {/* Lighter label text and icon color */}
             <label className="flex items-center text-sm font-medium text-gray-300 mb-1">
               <CreditCard className="h-4 w-4 mr-1 text-indigo-400" /> Payment Type
             </label>
             <div className="grid grid-cols-4 gap-2">
-              {PAYMENT_TYPES.map(p => (
+              {CURRENT_PAYMENT_TYPES.map(p => (
                 <button
                   key={p}
                   onClick={() => setPaymentType(p)}
-                  className={`py-2 px-1 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition duration-150 border-2 
+                  className={`py-3 px-1 sm:px-3 rounded-lg font-medium transition  text-[10px]  duration-150 border-2 
                     ${paymentType === p
-                      ? getPaymentClasses(p) // Selected: Use specific color classes
-                      : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600' // Unselected: Use neutral dark mode style
+                      ? getPaymentClasses(p)
+                      : `bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600`
                     } 
                   `}
                 >
@@ -534,9 +625,8 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Custom Keypad & Submit Button (Keypad buttons use p-4, which is okay) */}
+        {/* Custom Keypad & Submit Button */}
         <div className="grid grid-cols-4 gap-2 mb-4">
-          {/* KeypadButton component handles dark mode internally */}
           {['7', '8', '9', 'C'].map(key => (
             <KeypadButton key={key} value={key} onClick={handleKey} isUtility={key !== 'C'} />
           ))}
@@ -550,18 +640,24 @@ const App: React.FC = () => {
             <KeypadButton key={key} value={key} onClick={handleKey} />
           ))}
           <button
-            onClick={handleSubmitExpense}
+            onClick={handleSubmitTransaction}
             disabled={isSubmitting || isUpdatingOverall}
             className={`col-span-2 flex items-center justify-center rounded-xl p-4 text-white font-semibold transition duration-200 shadow-lg ${isSubmitting || isUpdatingOverall
-              ? 'bg-indigo-800 cursor-not-allowed' // Darker disabled blue
-              : 'bg-indigo-600 hover:bg-indigo-500 active:shadow-none active:translate-y-0.5' // Adjusted hover for better dark contrast
+              ? 'bg-indigo-800 cursor-not-allowed'
+              : transactionType === 'expense'
+                ? 'bg-red-600 hover:bg-red-500 active:shadow-none active:translate-y-0.5'
+                : 'bg-green-600 hover:bg-green-500 active:shadow-none active:translate-y-0.5'
               }`}
           >
             {isSubmitting ? (
               <Loader2 className="animate-spin h-5 w-5" />
             ) : (
               <>
-                <Send className="h-5 w-5 mr-2" /> Log Expense
+                {transactionType === 'expense' ?
+                  <><Send className="h-5 w-5 mr-2" /> Log Expense</>
+                  :
+                  <><Wallet className="h-5 w-5 mr-2" /> Log Income</>
+                }
               </>
             )}
           </button>
@@ -570,7 +666,6 @@ const App: React.FC = () => {
         {/* View Transactions Button */}
         <button
           onClick={() => setShowTransactionsModal(true)}
-          // Adjusted color for dark mode main action
           className="w-full flex items-center justify-center rounded-lg p-3 text-sm font-semibold transition duration-200 border bg-indigo-600 text-white hover:bg-indigo-500 mt-4 shadow-md hover:shadow-lg"
         >
           <Eye className="h-4 w-4 mr-2" /> View All {expenseHistory.length} Transactions
@@ -580,7 +675,6 @@ const App: React.FC = () => {
         <button
           onClick={loadExpenses}
           disabled={isLoading || isSubmitting || isUpdatingOverall}
-          // Dark mode refresh button: darker background, lighter text/icon, darker hover
           className={`w-full flex items-center justify-center rounded-lg p-3 text-sm font-semibold transition duration-200 border ${isLoading || isSubmitting || isUpdatingOverall
             ? 'bg-gray-800 text-gray-500 cursor-not-allowed border-gray-700'
             : 'bg-gray-700 text-indigo-400 border-indigo-900 hover:bg-gray-600'
@@ -591,33 +685,38 @@ const App: React.FC = () => {
         </button>
 
         {/* Submission Error Message */}
-        {submitError && (
-          // Darker error message background, lighter text
-          <div className="mt-4 p-3 bg-red-900 border border-red-700 text-red-300 rounded-lg flex items-center">
-            <X className="h-5 w-5 mr-2" />
-            <p className="text-sm">{submitError}</p>
-          </div>
-        )}
-      </main>
+        {
+          submitError && (
+            <div className="mt-4 p-3 bg-red-900 border border-red-700 text-red-300 rounded-lg flex items-center">
+              <X className="h-5 w-5 mr-2" />
+              <p className="text-sm">{submitError}</p>
+            </div>
+          )
+        }
+      </main >
 
       {/* RENDER MODALS */}
-      {showSheetIdModal && (
-        <SheetIdModal
-          onSubmit={handleSetSheetId}
-          onClose={() => setShowSheetIdModal(false)}
-          initialSheetId={getInitialSheetId()}
-          error={submitError}
-        />
-      )}
+      {
+        showSheetIdModal && (
+          <SheetIdModal
+            onSubmit={handleSetSheetId}
+            onClose={() => setShowSheetIdModal(false)}
+            initialSheetId={getInitialSheetId()}
+            error={submitError}
+          />
+        )
+      }
 
-      {showTransactionsModal && (
-        <TransactionsModal
-          expenses={expenseHistory}
-          onClose={() => setShowTransactionsModal(false)}
-        />
-      )}
+      {
+        showTransactionsModal && (
+          <TransactionsModal
+            expenses={expenseHistory}
+            onClose={() => setShowTransactionsModal(false)}
+          />
+        )
+      }
 
-    </div>
+    </div >
   );
 };
 
