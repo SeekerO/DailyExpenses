@@ -438,7 +438,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col items-center p-4">
 
-      <header className="w-full max-w-lg mb-6 text-center">
+      {/* <header className="w-full max-w-lg mb-6 text-center">
         <h1 className="text-3xl font-extrabold text-indigo-400 tracking-tight">Daily Financial Log</h1>
         <p className="text-sm text-gray-400 mt-1 flex justify-center items-center">
           <span className="font-semibold text-green-400">LIVE DATA: </span>
@@ -454,7 +454,7 @@ const App: React.FC = () => {
             <Database className="h-4 w-4" />
           </button>
         </p>
-      </header>
+      </header> */}
 
       <main className="w-full max-w-md bg-gray-800 rounded-xl shadow-2xl p-4 sm:p-6 mb-8">
 
