@@ -134,7 +134,7 @@ const App: React.FC = () => {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // MODIFIED CATEGORIES: Added Income option
-  const EXPENSE_CATEGORIES = useMemo(() => ['Take-out', 'Dine-in', 'Groceries', 'Transport', 'Utilities', 'Entertainment', 'Bills', 'Other', 'Lend'], []);
+  const EXPENSE_CATEGORIES = useMemo(() => ['Food', 'Groceries', 'Transport', 'Utilities', 'Entertainment', 'Bills', 'Borrowed', 'Other'], []);
   const INCOME_CATEGORIES = useMemo(() => ['Salary', 'Allowance', 'Other Income'], []); // NEW INCOME CATEGORIES
 
   // MODIFIED PAYMENT_TYPES: Separated for clarity, and added Salary/Allowance as requested
