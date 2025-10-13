@@ -10,7 +10,7 @@ import {
 interface SheetIdModalProps {
     onSubmit: (id: string) => void;
     onClose: () => void;
-    initialSheetId: string;
+    initialSheetId: any;
     error: string | null;
 }
 

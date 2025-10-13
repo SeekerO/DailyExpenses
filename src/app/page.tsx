@@ -1,3 +1,5 @@
+// page.tsx (MODIFIED)
+
 'use client'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -11,17 +13,17 @@ import {
   Send,
   Loader2,
   RefreshCw,
-  Database, // Icon for sheet ID
-  Save, // Icon for overall money save
-  Eye, // Icon for viewing transactions
-  EyeOff,
-  Wallet, // New icon for Income
+  Eye,
+  Wallet,
+  Database,
 }
   from 'lucide-react';
 
 import TransactionsModal from './lib/components/TransactionModal';
 import SheetIdModal from './lib/components/SheetiIdModal';
 import KeypadButton from './lib/components/KeypadButton';
+// NEW IMPORT: Balance Modal
+import BalanceModal from './lib/components/BalanceModal';
 
 // --- Type Definitions ---
 export interface Expense {
@@ -29,23 +31,26 @@ export interface Expense {
   time_stamp: string;
   category: string;
   payment: string;
-  // NOTE: This expense property will now store the amount, 
-  // which will be positive for expenses and positive for income 
-  // in the local state, but the API logic will determine its sign/impact.
   expense: number;
   total: number;
   userId: string;
 }
 
-// --- API Service Functions (Modified for Income Type) ---
+// --- API Service Functions ---
 const MOCK_USER_ID = 'live-sheet-user-5000';
 
-const fetchExpenses = async (sheetId: string): Promise<{ expenses: Expense[], overallMoney: number, data: any }> => {
+const fetchExpenses = async (sheetId: string): Promise<{
+  expenses: Expense[],
+  overallMoney: number, // F2 (Cash Balance)
+  creditBalance: number, // G2
+  debitBalance: number,  // H2
+  data: any
+}> => {
   const response = await fetch(`/api/expenses?sheetId=${sheetId}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch expenses from API. Status: ${response.status}`);
   }
-  const data: { expenses: [], overallMoney: any } = await response.json();
+  const data: { expenses: [], overallMoney: any, creditBalance: any, debitBalance: any, totalExpense: any } = await response.json();
 
   const expenses: Expense[] = data.expenses.map((item: any) => ({
     ...item,
@@ -53,18 +58,17 @@ const fetchExpenses = async (sheetId: string): Promise<{ expenses: Expense[], ov
     total: parseFloat(item.total)
   }));
 
-
   const overallMoney: number = parseFloat(data.overallMoney) || 0;
+  const creditBalance: number = parseFloat(data.creditBalance) || 0;
+  const debitBalance: number = parseFloat(data.debitBalance) || 0;
 
-  return { expenses, overallMoney, data };
+  return { expenses, overallMoney, creditBalance, debitBalance, data };
 };
 
-// MODIFIED: Added type property (expense or income) to the payload
 const saveExpenseOrIncomeViaAPI = async (
   sheetId: string,
   newTransaction: Omit<Expense, 'id' | 'total'> & { type: 'expense' | 'income' }
 ): Promise<void> => {
-  // Assume the API endpoint remains the same, but it now handles a 'type' property
   const response = await fetch('/api/expenses', {
     method: 'POST',
     headers: {
@@ -79,19 +83,22 @@ const saveExpenseOrIncomeViaAPI = async (
   }
 };
 
-// This function handles the "starting money" update as requested
-const updateOverallMoneyViaAPI = async (sheetId: string, overallMoney: number): Promise<void> => {
+const updateBalanceViaAPI = async (
+  sheetId: string,
+  newBalance: number,
+  cellReference: 'F2' | 'G2' | 'H2'
+): Promise<void> => {
   const response = await fetch('/api/expenses', {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ sheetId, overallMoney }),
+    body: JSON.stringify({ sheetId, newBalance, cellReference }),
   });
 
   if (!response.ok) {
     const errorDetail = await response.text();
-    throw new Error(`Failed to update overall money: ${response.status} - ${errorDetail}`);
+    throw new Error(`Failed to update ${cellReference}: ${response.status} - ${errorDetail}`);
   }
 };
 
@@ -101,60 +108,59 @@ const updateOverallMoneyViaAPI = async (sheetId: string, overallMoney: number): 
 const App: React.FC = () => {
   const [userId] = useState<string>(MOCK_USER_ID);
 
-  // State for Sheet ID
   const [sheetId, setSheetId] = useState<string | null>(null);
   const [showSheetIdModal, setShowSheetIdModal] = useState(false);
-
-  // State for Transactions Modal
   const [showTransactionsModal, setShowTransactionsModal] = useState(false);
+  // NEW STATE: Control for the new Balance Modal
+  const [showBalanceModal, setShowBalanceModal] = useState(false);
 
-  // State for Balance
-  const [showBalance, setShowBalance] = useState<boolean | null>(true);
+  // REMOVED: showBalance and showLayoutBalance states
 
-  // State for Layout Balance Toggle
-  const [showLayoutBalance, setShowLayoutBalance] = useState(false);
-
-  // Initial state for isLoading should be true
   const [isLoading, setIsLoading] = useState(true);
   const [currentInput, setCurrentInput] = useState('0');
 
-  // MODIFIED: Default category/payment for expense/income
   const [category, setCategory] = useState('Groceries');
   const [paymentType, setPaymentType] = useState('GCASH/MAYA');
-  const [transactionType, setTransactionType] = useState<'expense' | 'income'>('expense'); // NEW STATE
+  const [transactionType, setTransactionType] = useState<'expense' | 'income'>('expense');
   const [expenseHistory, setExpenseHistory] = useState<Expense[]>([]);
 
-  // State for Overall Money
-  const [overallMoney, setOverallMoney] = useState(0);
-  const [overallMoneyInput, setOverallMoneyInput] = useState('');
+  // State for Cash Balance (F2) 
+  const [cashBalance, setCashBalance] = useState(0);
+  const [cashBalanceInput, setCashBalanceInput] = useState('');
+
+  // State for Credit Balance (G2)
+  const [creditBalance, setCreditBalance] = useState(0);
+  const [creditBalanceInput, setCreditBalanceInput] = useState('');
+
+  // State for Debit Balance (H2)
+  const [debitBalance, setDebitBalance] = useState(0);
+  const [debitBalanceInput, setDebitBalanceInput] = useState('');
+
   const [totalExpense, setTotalExpense] = useState(0)
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUpdatingOverall, setIsUpdatingOverall] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // MODIFIED CATEGORIES: Added Income option
   const EXPENSE_CATEGORIES = useMemo(() => ['Food', 'Groceries', 'Transport', 'Utilities', 'Entertainment', 'Bills', 'Borrowed', 'Other'], []);
-  const INCOME_CATEGORIES = useMemo(() => ['Salary', 'Allowance', 'Other Income'], []); // NEW INCOME CATEGORIES
 
-  // MODIFIED PAYMENT_TYPES: Separated for clarity, and added Salary/Allowance as requested
-  const EXPENSE_PAYMENT_TYPES = useMemo(() => ['GCASH/MAYA', 'CASH', 'Credit', 'Debit'], []);
-  const INCOME_PAYMENT_TYPES = useMemo(() => ['Salary', 'Allowance'], []); // NEW INCOME PAYMENT TYPES
+  const INCOME_CATEGORIES = useMemo(() => ['Cash', 'Debit', 'Credit'], []);
 
-  // Conditional Categories and Payment Types based on transaction type
+  const EXPENSE_PAYMENT_TYPES = useMemo(() => ['eCash', 'Cash', 'Credit', 'Debit'], []);
+
+  const INCOME_PAYMENT_TYPES = useMemo(() => ['Salary', 'Allowance', 'Refund', 'Investment', 'Other'], []);
+
   const CURRENT_CATEGORIES = transactionType === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
   const CURRENT_PAYMENT_TYPES = transactionType === 'expense' ? EXPENSE_PAYMENT_TYPES : INCOME_PAYMENT_TYPES;
 
 
-  // --- Sheet ID and Local Storage Logic (FIXED) ---
+  // --- Sheet ID and Local Storage Logic ---
   useEffect(() => {
-    // Check for client environment before accessing localStorage
     if (typeof window !== 'undefined') {
       const savedSheetId = localStorage.getItem('googleSheetId');
       if (savedSheetId) {
         setSheetId(savedSheetId);
       } else {
-        // If no ID is found, stop loading and show the modal
         setShowSheetIdModal(true);
         setIsLoading(false);
       }
@@ -163,7 +169,6 @@ const App: React.FC = () => {
 
   const handleSetSheetId = (id: string) => {
     if (id) {
-      // Check for client environment before accessing localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('googleSheetId', id);
       }
@@ -179,7 +184,7 @@ const App: React.FC = () => {
   };
 
 
-  // Function to load and set expenses (Unchanged)
+  // Function to load and set expenses 
   const loadExpenses = useCallback(async () => {
     if (!sheetId) {
       setIsLoading(false);
@@ -189,13 +194,27 @@ const App: React.FC = () => {
     setIsLoading(true);
     setSubmitError(null);
     try {
-      const { expenses, overallMoney: loadedOverallMoney, data } = await fetchExpenses(sheetId);
+      const {
+        expenses,
+        overallMoney: loadedCashBalance,
+        creditBalance: loadedCreditBalance,
+        debitBalance: loadedDebitBalance,
+        data
+      } = await fetchExpenses(sheetId);
 
       expenses.sort((a, b) => new Date(b.time_stamp).getTime() - new Date(a.time_stamp).getTime());
       const convertToFloat = parseFloat(data.totalExpense)
       setExpenseHistory(expenses);
-      setOverallMoney(loadedOverallMoney);
-      setOverallMoneyInput(loadedOverallMoney.toString());
+
+      setCashBalance(loadedCashBalance);
+      setCashBalanceInput(loadedCashBalance.toString());
+
+      setCreditBalance(loadedCreditBalance);
+      setCreditBalanceInput(loadedCreditBalance.toString());
+
+      setDebitBalance(loadedDebitBalance);
+      setDebitBalanceInput(loadedDebitBalance.toString());
+
       setTotalExpense(convertToFloat)
 
     } catch (e) {
@@ -206,7 +225,6 @@ const App: React.FC = () => {
     }
   }, [sheetId]);
 
-  // Initial Data Load from "Sheet" (via API) - Triggers when sheetId state changes
   useEffect(() => {
     if (sheetId) {
       loadExpenses();
@@ -214,29 +232,58 @@ const App: React.FC = () => {
   }, [sheetId, loadExpenses]);
 
 
-  // // MODIFIED: Calculate total expenses, total income, and remaining money
-  // const { totalExpenses } = useMemo(() => {
-  //   let expenses = 0;
-  //   // We assume expenseHistory from the API only contains expense entries
-  //   expenseHistory.forEach(e => {
-  //     expenses += e.expense;
-  //   });
+  // Calculate the segregated balances and deductions (Client-side)
+  const {
+    moneyBalance,
+    creditDebtBalance,
+    debitUsageBalance,
+    cashDeducted,
+    creditDeducted,
+    debitDeducted,
+    totalOverallBalance
+  } = useMemo(() => {
+    let cashDeducted = 0;
+    let creditDeducted = 0;
+    let debitDeducted = 0;
 
-  //   return {
-  //     totalExpenses: expenses,
-  //   };
-  // }, [expenseHistory]);
+    expenseHistory.forEach(e => {
+      const amount = e.expense;
 
-  const { remainingMoney, totalDeducted } = useMemo(() => {
-    const deducted = totalExpense;
-    const remaining = overallMoney - deducted;
+      // Only calculate deductions for transactions that are not the new income categories
+      if (!INCOME_CATEGORIES.includes(e.category)) {
+        switch (e.payment) {
+          case 'Credit':
+            creditDeducted += amount;
+            break;
+          case 'Debit':
+            debitDeducted += amount;
+            break;
+          case 'GCASH/MAYA':
+          case 'CASH':
+            cashDeducted += amount;
+            break;
+        }
+      }
+    });
+
+    const moneyBalance = cashBalance - cashDeducted;
+    const creditDebtBalance = creditBalance;
+    const debitUsageBalance = debitBalance;
+
+    const totalOverallBalance = cashBalance + creditBalance + debitBalance;
 
     return {
-      remainingMoney: remaining,
-      totalDeducted: deducted,
+      moneyBalance,
+      creditDebtBalance,
+      debitUsageBalance,
+      cashDeducted,
+      creditDeducted,
+      debitDeducted,
+      totalOverallBalance
     };
-  }, [overallMoney, totalExpense]);
+  }, [cashBalance, creditBalance, debitBalance, expenseHistory, INCOME_CATEGORIES]);
 
+  const remainingMoney = moneyBalance;
 
   // --- Keypad Logic (Unchanged) ---
   const handleKey = useCallback((key: string) => {
@@ -265,7 +312,7 @@ const App: React.FC = () => {
     });
   }, []);
 
-  // NEW: Handler to toggle transaction type and reset category/payment
+  // Handler to toggle transaction type and reset category/payment
   const handleTransactionTypeToggle = (type: 'expense' | 'income') => {
     setTransactionType(type);
     setCurrentInput('0');
@@ -276,14 +323,74 @@ const App: React.FC = () => {
       setCategory(EXPENSE_CATEGORIES[0]);
       setPaymentType(EXPENSE_PAYMENT_TYPES[0]);
     } else {
-      // Set to Salary or Allowance as they are the new main choices for income
-      setCategory(INCOME_CATEGORIES[0]); // Defaults to 'Salary'
-      setPaymentType(INCOME_PAYMENT_TYPES[0]); // Defaults to 'Salary'
+      setCategory(INCOME_CATEGORIES[0]);
+      setPaymentType(INCOME_PAYMENT_TYPES[0]);
     }
   }
 
 
-  // MODIFIED: Consolidated submission logic for both Expense and Income
+  // --- Balance Update Handler for F2, G2, H2 (Unchanged, passed to Modal) ---
+  const handleUpdateBalance = async (
+    balanceType: 'cash' | 'credit' | 'debit'
+  ) => {
+    if (!sheetId) {
+      setSubmitError("Please set the Google Sheet ID first.");
+      setShowSheetIdModal(true);
+      return;
+    }
+
+    let inputString: string;
+    let cellRef: 'F2' | 'G2' | 'H2';
+    let setter: React.Dispatch<React.SetStateAction<number>>;
+    let inputSetter: React.Dispatch<React.SetStateAction<string>>;
+
+    switch (balanceType) {
+      case 'cash':
+        inputString = cashBalanceInput;
+        cellRef = 'F2';
+        setter = setCashBalance;
+        inputSetter = setCashBalanceInput;
+        break;
+      case 'credit':
+        inputString = creditBalanceInput;
+        cellRef = 'G2';
+        setter = setCreditBalance;
+        inputSetter = setCreditBalanceInput;
+        break;
+      case 'debit':
+        inputString = debitBalanceInput;
+        cellRef = 'H2';
+        setter = setDebitBalance;
+        inputSetter = setDebitBalanceInput;
+        break;
+      default:
+        return;
+    }
+
+    const amount = parseFloat(inputString);
+    if (isNaN(amount)) {
+      setSubmitError(`Please enter a valid value for ${balanceType} balance.`);
+      return;
+    }
+
+    setIsUpdatingOverall(true);
+    setSubmitError(null);
+
+    try {
+      await updateBalanceViaAPI(sheetId, amount, cellRef);
+      setter(amount);
+      inputSetter(amount.toString());
+
+    } catch (e) {
+      console.error(`Error updating ${balanceType} balance: `, e);
+      setSubmitError((e as Error).message || `Failed to update ${balanceType} balance. Check API logs.`);
+    } finally {
+      setIsUpdatingOverall(false);
+    }
+  };
+
+
+  // Submission logic with specific balance updates for Income categories
   const handleSubmitTransaction = async () => {
     if (!sheetId) {
       setSubmitError("Please set the Google Sheet ID first.");
@@ -304,77 +411,64 @@ const App: React.FC = () => {
       time_stamp: new Date().toISOString(),
       category: category,
       payment: paymentType,
-      expense: amount, // The API will handle the sign based on 'type'
+      expense: amount,
       userId: userId,
-      type: transactionType, // NEW PROPERTY
+      type: transactionType,
     };
 
     try {
-      // Log the transaction type to the console as requested by the user's intent to "log it when I added money"
-      console.log(`Submitting ${transactionType.toUpperCase()} with details:`, {
-        amount: amount,
-        category: category,
-        payment: paymentType
-      });
+      await saveExpenseOrIncomeViaAPI(sheetId, newTransaction);
 
-      await saveExpenseOrIncomeViaAPI(sheetId, newTransaction); // MODIFIED API CALL
-
-      // --- NEW LOGIC: Conditional PATCH for Overall Money (F2) when logging Income ---
+      // --- Logic: Conditional PATCH for F2, G2, or H2 based on Income Category ---
       if (transactionType === 'income') {
-        // Calculate the new overall money by adding the income amount
-        const newOverallMoney = overallMoney + amount;
+        let newBalance: number;
+        let cellRef: 'F2' | 'G2' | 'H2';
+        let setter: React.Dispatch<React.SetStateAction<number>>;
+        let inputSetter: React.Dispatch<React.SetStateAction<string>>;
 
-        // Explicitly call the PATCH API to update cell F2
-        await updateOverallMoneyViaAPI(sheetId, newOverallMoney);
+        switch (category) {
+          case 'Cash':
+            newBalance = cashBalance + amount;
+            cellRef = 'F2';
+            setter = setCashBalance;
+            inputSetter = setCashBalanceInput;
+            break;
+          case 'Credit':
+            newBalance = creditBalance + amount;
+            cellRef = 'G2';
+            setter = setCreditBalance;
+            inputSetter = setCreditBalanceInput;
+            break;
+          case 'Debit':
+            newBalance = debitBalance + amount;
+            cellRef = 'H2';
+            setter = setDebitBalance;
+            inputSetter = setDebitBalanceInput;
+            break;
+          default:
+            console.warn(`Income category "${category}" did not match a balance account. Reloading expenses only.`);
+            await loadExpenses();
+            setIsSubmitting(false);
+            setCurrentInput('0');
+            return;
+        }
 
-        // Update local state immediately (optional, loadExpenses will confirm)
-        setOverallMoney(newOverallMoney);
-        setOverallMoneyInput(newOverallMoney.toString());
+        await updateBalanceViaAPI(sheetId, newBalance, cellRef);
+
+        setter(newBalance);
+        inputSetter(newBalance.toString());
       }
-      // --- END NEW LOGIC ---
+      // --- END Income Logic ---
 
-      // Reload all data to refresh transactions, total expense, and confirm F2 (if not updated above)
       await loadExpenses();
 
       setCurrentInput('0');
-
-      // Keep the current category/payment type for the user's next log (convenience)
 
     } catch (e) {
       console.error(`Error saving ${transactionType} to live sheet: `, e);
       setSubmitError((e as Error).message || `Failed to save ${transactionType}. Please check network.`);
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  // --- Overall Money Update Handler (Starting Money Function) ---
-  const handleUpdateOverallMoney = async () => {
-    if (!sheetId) {
-      setSubmitError("Please set the Google Sheet ID first.");
-      setShowSheetIdModal(true);
-      return;
-    }
-
-    const amount = parseFloat(overallMoneyInput);
-    if (isNaN(amount) || amount < 0) {
-      setSubmitError("Please enter a valid value for overall money.");
-      return;
-    }
-
-    setIsUpdatingOverall(true);
-    setSubmitError(null);
-
-    try {
-      await updateOverallMoneyViaAPI(sheetId, amount);
-      setOverallMoney(amount);
-      setOverallMoneyInput(amount.toString());
-
-    } catch (e) {
-      console.error("Error updating overall money: ", e);
-      setSubmitError((e as Error).message || "Failed to update overall money. Check API logs.");
-    } finally {
-      setIsUpdatingOverall(false);
     }
   };
 
@@ -397,34 +491,34 @@ const App: React.FC = () => {
         return 'bg-purple-600 text-white border-purple-700 shadow-md hover:bg-purple-500';
       case 'Debit':
         return 'bg-indigo-600 text-white border-indigo-700 shadow-md hover:bg-indigo-500';
-      // NEW: Income Types (Salary/Allowance)
       case 'Salary':
         return 'bg-emerald-600 text-white border-emerald-700 shadow-md hover:bg-emerald-500';
       case 'Allowance':
         return 'bg-cyan-600 text-white border-cyan-700 shadow-md hover:bg-cyan-500';
+      case 'Refund':
+        return 'bg-yellow-600 text-white border-yellow-700 shadow-md hover:bg-yellow-500';
+      case 'Investment':
+        return 'bg-pink-600 text-white border-pink-700 shadow-md hover:bg-pink-500';
+      case 'Other':
+        return 'bg-gray-600 text-white border-gray-700 shadow-md hover:bg-gray-500';
       default:
         return 'bg-indigo-600 text-white border-indigo-700 shadow-md hover:bg-indigo-500';
     }
   };
 
-  const handleSHowBalanceLayoutToggle = () => {
-    setShowBalance(!showBalance)
-  }
+  // REMOVED: handleSHowBalanceLayoutToggle
 
   // --- Main Render Logic ---
 
   if (isLoading && sheetId) {
     return (
-      // Dark Mode Background
       <div className="flex items-center justify-center min-h-screen bg-gray-900">
         <Loader2 className="animate-spin text-indigo-400 h-8 w-8" />
-        {/* Lighter text for dark mode */}
         <span className="ml-3 text-indigo-400">Loading Live Google Sheet Data via API...</span>
       </div>
     );
   }
 
-  // Show modal if sheet ID is missing
   if (showSheetIdModal || !sheetId) {
     return <SheetIdModal
       onSubmit={handleSetSheetId}
@@ -438,108 +532,35 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col items-center p-4">
 
-      {/* <header className="w-full max-w-lg mb-6 text-center">
-        <h1 className="text-3xl font-extrabold text-indigo-400 tracking-tight">Daily Financial Log</h1>
-        <p className="text-sm text-gray-400 mt-1 flex justify-center items-center">
-          <span className="font-semibold text-green-400">LIVE DATA: </span>
-          Connected to secure Back-end API for Google Sheet access.
-          <button
-            onClick={() => {
-              setSubmitError(null);
-              setShowSheetIdModal(true);
-            }}
-            className="ml-2 p-1 rounded-full text-indigo-400 hover:bg-gray-700 transition"
-            title="Change Sheet ID"
-          >
-            <Database className="h-4 w-4" />
-          </button>
-        </p>
-      </header> */}
-
       <main className="w-full max-w-md bg-gray-800 rounded-xl shadow-2xl p-4 sm:p-6 mb-8">
 
+        {/* --- Header & Refresh Button --- */}
         <div className='w-full relative flex items-center gap-3 mb-4'>
-          <button onClick={() => setShowLayoutBalance(!showLayoutBalance)} className=' text-white'>
-            {showLayoutBalance ? <EyeOff /> : <Eye />}
+          {/* NEW BUTTON: Open Balance Modal */}
+          <button
+            onClick={() => setShowBalanceModal(true)}
+            className='flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-700 text-indigo-400 hover:bg-gray-600 transition space-x-2'
+          >
+            <Wallet className='h-4 w-4' /> <span>Manage Balances</span>
           </button>
 
-          {showLayoutBalance && <button
-            onClick={() => handleSHowBalanceLayoutToggle()}
-            className=" px-3 py-1 rounded-full text-sm font-medium bg-gray-700 text-indigo-400 hover:bg-gray-600 transition"
+
+          <button
+            onClick={loadExpenses}
+            disabled={isLoading || isSubmitting || isUpdatingOverall}
+            className={`ml-auto flex items-center justify-center rounded-lg p-2 text-sm font-semibold transition duration-200 border w-1/3 ${isLoading || isSubmitting || isUpdatingOverall
+              ? 'bg-gray-800 text-gray-500 cursor-not-allowed border-gray-700'
+              : 'bg-gray-700 text-indigo-400 border-indigo-900 hover:bg-gray-600'
+              }`}
           >
-            {showBalance ? 'Set Money' : 'Show Balance'}
-          </button>}
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
 
         </div>
 
-        {/* --- Overall Money/Balance Section --- */}
-        {showLayoutBalance && <>
-          {!showBalance && showBalance !== null ?
-            // UI for modifying starting money (OverallMoneyInput)
-            <div className="bg-green-950 p-4 rounded-lg shadow-inner mb-6">
-              <div className="flex justify-between items-center text-green-300 mb-2">
-                <span className="text-xs sm:text-sm font-medium uppercase">Overall Starting Money (Sheet F2):</span>
-              </div>
+        {/* REMOVED: The entire showLayoutBalance block has been moved to BalanceModal */}
 
-              <div className="flex items-center">
-                <input
-                  type="number"
-                  value={overallMoneyInput}
-                  onChange={(e) => setOverallMoneyInput(e.target.value)}
-                  placeholder="Update starting money"
-                  className="w-full py-2 px-3 border border-gray-700 bg-gray-700 text-gray-100 rounded-l-lg shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-sm"
-                  disabled={isUpdatingOverall}
-                />
-                <button
-                  onClick={handleUpdateOverallMoney}
-                  disabled={isUpdatingOverall || overallMoneyInput === overallMoney.toString()}
-                  className={`flex items-center justify-center py-2 px-4 rounded-r-lg text-white font-semibold transition duration-200 ${isUpdatingOverall || overallMoneyInput === overallMoney.toString()
-                    ? 'bg-green-700 cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-500'
-                    }`}
-                >
-                  {isUpdatingOverall ? (
-                    <Loader2 className="animate-spin h-5 w-5" />
-                  ) : (
-                    <Save className="h-5 w-5" />
-                  )}
-                </button>
-              </div>
-            </div>
-            :
-            // UI for displaying balance
-            <div className="bg-indigo-950 p-4 rounded-lg shadow-inner mb-6">
-              <h3 className="text-base sm:text-md font-extrabold text-indigo-400 mb-3 border-b border-indigo-900 pb-2 flex items-center">
-                <PesoSign className="h-5 w-5 mr-2" /> Overall Balance
-              </h3>
-
-              <div className="flex justify-between items-center py-1">
-                <span className="text-sm sm:text-base font-medium text-gray-300">Overall Starting Money:</span>
-                <span className="text-md sm:text-lg font-bold text-green-400">
-                  {overallMoney.toFixed(2)}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center py-1">
-                <span className="text-sm sm:text-base font-medium text-gray-300">Total Deducted (Expenses):</span>
-                <span className="text-lg sm:text-xl font-bold text-red-400">
-                  {totalDeducted.toFixed(2)}
-                </span>
-              </div>
-
-              <div className="h-px bg-indigo-900 my-2"></div>
-
-              <div className="flex justify-between items-center pt-2">
-                <span className="text-lg sm:text-md font-bold text-indigo-400">Available Money:</span>
-                <span className={`text-xl sm:text-lg font-extrabold ${remainingMoney >= 0 ? 'text-indigo-400' : 'text-red-400'}`}>
-                  {remainingMoney.toFixed(2)}
-                </span>
-              </div>
-            </div>
-          }
-        </>}
-
-        {/* NEW: Transaction Type Toggle (Expense or Income) */}
+        {/* Transaction Type Toggle (Expense or Income) */}
         <div className='flex justify-center gap-3 mb-6'>
           <button
             onClick={() => handleTransactionTypeToggle('expense')}
@@ -570,7 +591,7 @@ const App: React.FC = () => {
             </label>
           </div>
           <div className="relative">
-            <label className='text-[11px] text-gray-500 absolute left-4 bottom-1'>Available Balance:    ₱{remainingMoney.toFixed(2)}</label>
+            <label className='text-[11px] text-gray-500 absolute left-4 bottom-1'>Available Cash Balance: ₱{remainingMoney.toFixed(2)}</label>
             <PesoSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
@@ -584,10 +605,11 @@ const App: React.FC = () => {
 
         {/* Categories and Payment */}
         <div className="grid grid-cols-1 gap-4 mb-6">
-          {/* Category Dropdown (Uses CURRENT_CATEGORIES) */}
+          {/* Category Dropdown */}
           <div>
             <label htmlFor="category" className="flex items-center text-sm font-medium text-gray-300 mb-1">
-              <List className="h-4 w-4 mr-1 text-indigo-400" /> Category
+              <List className="h-4 w-4 mr-1 text-indigo-400" />
+              {transactionType === 'income' ? 'Account to Credit (Category)' : 'Category'}
             </label>
             <select
               id="category"
@@ -601,17 +623,18 @@ const App: React.FC = () => {
             </select>
           </div>
 
-          {/* Payment Type Grid (Uses CURRENT_PAYMENT_TYPES) */}
+          {/* Payment Type Grid */}
           <div>
             <label className="flex items-center text-sm font-medium text-gray-300 mb-1">
-              <CreditCard className="h-4 w-4 mr-1 text-indigo-400" /> Payment Type
+              <CreditCard className="h-4 w-4 mr-1 text-indigo-400" />
+              {transactionType === 'income' ? 'Income Source (Payment Type)' : 'Payment Type'}
             </label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-5 gap-2">
               {CURRENT_PAYMENT_TYPES.map(p => (
                 <button
                   key={p}
                   onClick={() => setPaymentType(p)}
-                  className={`py-3 px-1 sm:px-3 rounded-lg font-medium transition  text-[10px]  duration-150 border-2 
+                  className={`py-3 rounded-lg font-medium transition text-[11px]  duration-150 border-2 
                     ${paymentType === p
                       ? getPaymentClasses(p)
                       : `bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600`
@@ -628,10 +651,10 @@ const App: React.FC = () => {
         {/* Custom Keypad & Submit Button */}
         <div className="grid grid-cols-4 gap-2 mb-4">
           {['7', '8', '9', 'C'].map(key => (
-            <KeypadButton key={key} value={key} onClick={handleKey} isUtility={key !== 'C'} />
+            <KeypadButton key={key} value={key} onClick={handleKey} />
           ))}
           {['4', '5', '6', 'BACK'].map(key => (
-            <KeypadButton key={key} value={key} onClick={handleKey} isUtility={key !== 'BACK'} />
+            <KeypadButton key={key} value={key} onClick={handleKey} />
           ))}
           {['1', '2', '3', '.'].map(key => (
             <KeypadButton key={key} value={key} onClick={handleKey} />
@@ -671,19 +694,6 @@ const App: React.FC = () => {
           <Eye className="h-4 w-4 mr-2" /> View All {expenseHistory.length} Transactions
         </button>
 
-        {/* Refresh/Retry Button */}
-        <button
-          onClick={loadExpenses}
-          disabled={isLoading || isSubmitting || isUpdatingOverall}
-          className={`w-full flex items-center justify-center rounded-lg p-3 text-sm font-semibold transition duration-200 border ${isLoading || isSubmitting || isUpdatingOverall
-            ? 'bg-gray-800 text-gray-500 cursor-not-allowed border-gray-700'
-            : 'bg-gray-700 text-indigo-400 border-indigo-900 hover:bg-gray-600'
-            } mt-2`}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          {isLoading ? 'Refreshing...' : 'Refresh Data'}
-        </button>
-
         {/* Submission Error Message */}
         {
           submitError && (
@@ -712,6 +722,35 @@ const App: React.FC = () => {
           <TransactionsModal
             expenses={expenseHistory}
             onClose={() => setShowTransactionsModal(false)}
+          />
+        )
+      }
+
+      {/* NEW RENDER: Balance Modal */}
+      {
+        showBalanceModal && (
+          <BalanceModal
+            onClose={() => setShowBalanceModal(false)}
+            cashBalance={cashBalance}
+            creditBalance={creditBalance}
+            debitBalance={debitBalance}
+            totalOverallBalance={totalOverallBalance}
+            moneyBalance={moneyBalance}
+            creditDebtBalance={creditDebtBalance}
+            debitUsageBalance={debitUsageBalance}
+            cashDeducted={cashDeducted}
+            creditDeducted={creditDeducted}
+            debitDeducted={debitDeducted}
+            totalExpense={totalExpense}
+            cashBalanceInput={cashBalanceInput}
+            setCashBalanceInput={setCashBalanceInput}
+            creditBalanceInput={creditBalanceInput}
+            setCreditBalanceInput={setCreditBalanceInput}
+            debitBalanceInput={debitBalanceInput}
+            setDebitBalanceInput={setDebitBalanceInput}
+            handleUpdateBalance={handleUpdateBalance}
+            isUpdatingOverall={isUpdatingOverall}
+            submitError={submitError}
           />
         )
       }
