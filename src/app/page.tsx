@@ -1,5 +1,3 @@
-// page.tsx (MODIFIED)
-
 'use client'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
