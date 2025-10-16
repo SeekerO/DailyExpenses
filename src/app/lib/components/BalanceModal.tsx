@@ -128,7 +128,7 @@ const BalanceModal: React.FC<BalanceModalProps> = ({
 
                         {/* Money Balance (F2 minus Cash Deductions) */}
                         <div className="flex justify-between items-center py-1">
-                            <span className="text-sm sm:text-base font-medium text-gray-300">Money Balance (Cash/GCASH):</span>
+                            <span className="text-sm sm:text-base font-medium text-gray-300">Money Balance (Cash/eCash):</span>
                             <span className={`text-md sm:text-lg font-bold ${moneyBalance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                 {moneyBalance.toFixed(2)}
                             </span>
@@ -158,7 +158,7 @@ const BalanceModal: React.FC<BalanceModalProps> = ({
 
                         {/* Cash Deducted */}
                         <div className="flex justify-between items-center py-1">
-                            <span className="text-sm sm:text-base font-medium text-gray-300">Cash/GCASH Deducted:</span>
+                            <span className="text-sm sm:text-base font-medium text-gray-300">Cash/eCash Deducted:</span>
                             <span className="text-lg sm:text-xl font-bold text-red-400">
                                 {cashDeducted.toFixed(2)}
                             </span>

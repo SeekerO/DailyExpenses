@@ -118,7 +118,7 @@ const App: React.FC = () => {
   const [currentInput, setCurrentInput] = useState('0');
 
   const [category, setCategory] = useState('Groceries');
-  const [paymentType, setPaymentType] = useState('GCASH/MAYA');
+  const [paymentType, setPaymentType] = useState('Cash');
   const [transactionType, setTransactionType] = useState<'expense' | 'income'>('expense');
   const [expenseHistory, setExpenseHistory] = useState<Expense[]>([]);
 
@@ -245,28 +245,32 @@ const App: React.FC = () => {
     let debitDeducted = 0;
 
     expenseHistory.forEach(e => {
-      const amount = e.expense;
+      const amount = e.expense
 
       // Only calculate deductions for transactions that are not the new income categories
       if (!INCOME_CATEGORIES.includes(e.category)) {
-        switch (e.payment) {
-          case 'Credit':
+        switch (e.payment.toLowerCase()) {
+          case 'credit':
             creditDeducted += amount;
             break;
-          case 'Debit':
+          case 'debit':
             debitDeducted += amount;
             break;
-          case 'GCASH/MAYA':
-          case 'CASH':
+          case 'ecash':
+            cashDeducted += amount;
+            break
+          case 'cash':
             cashDeducted += amount;
             break;
         }
       }
     });
 
+
+
     const moneyBalance = cashBalance - cashDeducted;
-    const creditDebtBalance = creditBalance;
-    const debitUsageBalance = debitBalance;
+    const creditDebtBalance = creditBalance - creditDeducted;
+    const debitUsageBalance = debitBalance - debitDeducted;
 
     const totalOverallBalance = cashBalance + creditBalance + debitBalance;
 
@@ -481,7 +485,7 @@ const App: React.FC = () => {
 
   const getPaymentClasses = (paymentType: string) => {
     switch (paymentType) {
-      case 'GCASH/MAYA':
+      case 'eCash':
         return 'bg-blue-600 text-white border-blue-700 shadow-md hover:bg-blue-500';
       case 'CASH':
         return 'bg-green-700 text-white border-green-800 shadow-md hover:bg-green-600';
