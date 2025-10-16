@@ -534,7 +534,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col items-center p-4">
 
-      <main className="w-full max-w-md bg-gray-800 rounded-xl shadow-2xl p-4 sm:p-6 mb-8">
+      <main className="w-full max-w-md bg-gray-800 rounded-xl shadow-2xl p-4 sm:p-6">
 
         {/* --- Header & Refresh Button --- */}
         <div className='w-full relative flex items-center gap-3 mb-4'>
