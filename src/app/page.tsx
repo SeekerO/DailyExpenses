@@ -13,7 +13,6 @@ import {
   RefreshCw,
   Eye,
   Wallet,
-  Database,
 }
   from 'lucide-react';
 

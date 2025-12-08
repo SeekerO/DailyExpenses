@@ -1,4 +1,5 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -85,7 +86,7 @@ const BaccaratRecorder: React.FC = () => {
         const stats = getStatistics();
         const patterns = detectPatterns();
         const last10 = results.slice(0, 10).filter(r => r.winner !== 'tie');
-        const last20 = results.slice(0, 20).filter(r => r.winner !== 'tie');
+        // const last20 = results.slice(0, 20).filter(r => r.winner !== 'tie');
 
         const recentPlayer = last10.filter(r => r.winner === 'player').length;
         const recentBanker = last10.filter(r => r.winner === 'banker').length;
@@ -334,7 +335,7 @@ const BaccaratRecorder: React.FC = () => {
                     setCurrentShoe(data.currentShoe || 1);
                     setCurrentDealer(data.currentDealer || 1); // Import new dealer state
                 } catch (error) {
-                    alert('Invalid file format');
+                    alert('Invalid file format: \n' + error);
                 }
             };
             reader.readAsText(file);
@@ -369,7 +370,7 @@ const BaccaratRecorder: React.FC = () => {
         const ties = results.filter(r => r.winner === 'tie').length;
 
         // Calculate streaks
-        let currentStreak = { type: results[0].winner, count: 1 };
+        const currentStreak = { type: results[0].winner, count: 1 };
         for (let i = 1; i < results.length; i++) {
             if (results[i].winner === currentStreak.type && results[i].winner !== 'tie') {
                 currentStreak.count++;
