@@ -31,6 +31,9 @@ type GameResult = {
     dealerNumber: number;
     predictedWinner?: "player" | "banker";
     isCorrectPrediction?: boolean;
+    playerPair?: boolean;
+    bankerPair?: boolean;
+    super6?: boolean;
 };
 
 type Pattern = {
@@ -48,6 +51,8 @@ const BaccaratRecorder: React.FC = () => {
     const [selectedResult, setSelectedResult] = useState<Winner | null>(null);
     const [playerScore, setPlayerScore] = useState<string>("");
     const [bankerScore, setBankerScore] = useState<string>("");
+    const [playerPair, setPlayerPair] = useState<boolean>(false);
+    const [bankerPair, setBankerPair] = useState<boolean>(false);
     const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
     const [activeTab, setActiveTab] = useState<
         "recorder" | "stats" | "patterns" | "prediction"
@@ -76,9 +81,9 @@ const BaccaratRecorder: React.FC = () => {
         );
     }, [results, currentShoe, currentDealer]);
 
-    // helpers: get chronological (oldest → newest)
+    // helpers: get chronological (oldest -> newest)
 
-    const getChronological = (arr: any) => [...arr]; 
+    const getChronological = (arr: any) => [...arr];
 
     // ---- Statistics ----
     const getStatistics = () => {
@@ -99,6 +104,15 @@ const BaccaratRecorder: React.FC = () => {
                 correctPredictions: 0,
                 totalPredictions: 0,
                 predictionAccuracy: "0.0",
+                playerPairs: 0,
+                bankerPairs: 0,
+                super6s: 0,
+                pairRate: "0.0",
+                super6Rate: "0.0",
+                playerBonusWins: 0,
+                bankerBonusWins: 0,
+                playerBonusRate: "0.0",
+                bankerBonusRate: "0.0",
             };
         }
 
@@ -180,6 +194,26 @@ const BaccaratRecorder: React.FC = () => {
                 ? ((correctPredictions / totalPredictions) * 100).toFixed(1)
                 : "0.0";
 
+        // Additional stats for pairs, super6, bonuses
+        const playerPairs = results.filter((r) => r.playerPair).length;
+        const bankerPairs = results.filter((r) => r.bankerPair).length;
+        const super6s = results.filter((r) => r.super6).length;
+        const pairRate = (((playerPairs + bankerPairs) / total) * 100).toFixed(1);
+        const super6Rate = ((super6s / total) * 100).toFixed(1);
+
+        // Bonus wins: simple detection if margin >=4 or natural win
+        let playerBonusWins = 0;
+        let bankerBonusWins = 0;
+        results.forEach((r) => {
+            if (r.winner === "tie" || typeof r.playerScore !== "number" || typeof r.bankerScore !== "number") return;
+            const margin = Math.abs(r.playerScore - r.bankerScore);
+            const isNatural = r.playerScore >= 8 || r.bankerScore >= 8;
+            if (r.winner === "player" && (margin >= 4 || (isNatural && margin > 0))) playerBonusWins++;
+            if (r.winner === "banker" && (margin >= 4 || (isNatural && margin > 0))) bankerBonusWins++;
+        });
+        const playerBonusRate = ((playerBonusWins / total) * 100).toFixed(1);
+        const bankerBonusRate = ((bankerBonusWins / total) * 100).toFixed(1);
+
         return {
             total,
             playerWins,
@@ -199,6 +233,15 @@ const BaccaratRecorder: React.FC = () => {
             correctPredictions,
             totalPredictions,
             predictionAccuracy,
+            playerPairs,
+            bankerPairs,
+            super6s,
+            pairRate,
+            super6Rate,
+            playerBonusWins,
+            bankerBonusWins,
+            playerBonusRate,
+            bankerBonusRate,
         };
     };
 
@@ -282,6 +325,65 @@ const BaccaratRecorder: React.FC = () => {
             });
         }
 
+        // Tie patterns
+        const recentTies = results.slice(-10).filter((r) => r.winner === "tie").length;
+        if (recentTies >= 2) {
+            patterns.push({
+                type: "Tie Prone",
+                description: `${recentTies} ties in last 10 hands`,
+                strength: (recentTies / 10) * 100,
+            });
+        }
+
+        // Pair patterns
+        const recentPlayerPairs = results.slice(-10).filter((r) => r.playerPair).length;
+        const recentBankerPairs = results.slice(-10).filter((r) => r.bankerPair).length;
+        if (recentPlayerPairs + recentBankerPairs >= 2) {
+            patterns.push({
+                type: "Pair Likely",
+                description: `${recentPlayerPairs + recentBankerPairs} pairs in last 10 hands`,
+                strength: ((recentPlayerPairs + recentBankerPairs) / 10) * 100,
+            });
+        }
+
+        // Super6 patterns
+        const recentSuper6 = results.slice(-10).filter((r) => r.super6).length;
+        if (recentSuper6 >= 1) {
+            patterns.push({
+                type: "Super 6 Possible",
+                description: `${recentSuper6} Super 6 in last 10 hands`,
+                strength: (recentSuper6 / 10) * 100,
+            });
+        }
+
+        // Bonus patterns (simplified)
+        const recentPlayerBonus = results.slice(-10).filter((r) => {
+            if (r.winner !== "player" || typeof r.playerScore !== "number" || typeof r.bankerScore !== "number") return false;
+            const margin = r.playerScore - r.bankerScore;
+            const isNatural = r.playerScore >= 8;
+            return margin >= 4 || (isNatural && margin > 0);
+        }).length;
+        const recentBankerBonus = results.slice(-10).filter((r) => {
+            if (r.winner !== "banker" || typeof r.playerScore !== "number" || typeof r.bankerScore !== "number") return false;
+            const margin = r.bankerScore - r.playerScore;
+            const isNatural = r.bankerScore >= 8;
+            return margin >= 4 || (isNatural && margin > 0);
+        }).length;
+        if (recentPlayerBonus >= 1) {
+            patterns.push({
+                type: "Player Bonus Likely",
+                description: `${recentPlayerBonus} player bonuses in last 10 hands`,
+                strength: (recentPlayerBonus / 10) * 100,
+            });
+        }
+        if (recentBankerBonus >= 1) {
+            patterns.push({
+                type: "Banker Bonus Likely",
+                description: `${recentBankerBonus} banker bonuses in last 10 hands`,
+                strength: (recentBankerBonus / 10) * 100,
+            });
+        }
+
         if (patterns.length === 0) {
             patterns.push({
                 type: "Random Distribution",
@@ -306,6 +408,12 @@ const BaccaratRecorder: React.FC = () => {
                 alternate: null,
                 signals: [] as string[],
                 nextPattern: [] as ("player" | "banker" | "unknown")[],
+                tieConfidence: 0,
+                playerPairConfidence: 0,
+                bankerPairConfidence: 0,
+                super6Confidence: 0,
+                playerBonusConfidence: 0,
+                bankerBonusConfidence: 0,
             };
         }
 
@@ -428,6 +536,43 @@ const BaccaratRecorder: React.FC = () => {
             }
         });
 
+        // Additional predictions for tie, pairs, super6, bonuses
+        let tieConfidence = 9.5; // base
+        const tiePattern = patterns.find((p) => p.type === "Tie Prone");
+        if (tiePattern) {
+            tieConfidence = Math.min(tiePattern.strength + 9.5, 30);
+            signals.push("🟰 Tie prone");
+        }
+
+        let playerPairConfidence = 0;
+        let bankerPairConfidence = 0;
+        const pairPattern = patterns.find((p) => p.type === "Pair Likely");
+        if (pairPattern) {
+            playerPairConfidence = pairPattern.strength / 2;
+            bankerPairConfidence = pairPattern.strength / 2;
+            signals.push("👯 Pair likely");
+        }
+
+        let super6Confidence = 0;
+        const super6Pattern = patterns.find((p) => p.type === "Super 6 Possible");
+        if (super6Pattern) {
+            super6Confidence = super6Pattern.strength;
+            signals.push("6️⃣ Super 6 possible");
+        }
+
+        let playerBonusConfidence = 0;
+        let bankerBonusConfidence = 0;
+        const pBonusPattern = patterns.find((p) => p.type === "Player Bonus Likely");
+        const bBonusPattern = patterns.find((p) => p.type === "Banker Bonus Likely");
+        if (pBonusPattern) {
+            playerBonusConfidence = pBonusPattern.strength;
+            signals.push("🎁 Player bonus likely");
+        }
+        if (bBonusPattern) {
+            bankerBonusConfidence = bBonusPattern.strength;
+            signals.push("🎁 Banker bonus likely");
+        }
+
         return {
             prediction,
             confidence: Number(confidence.toFixed(1)),
@@ -435,19 +580,32 @@ const BaccaratRecorder: React.FC = () => {
             alternate,
             signals,
             nextPattern: nextPattern.slice(0, 6),
+            tieConfidence: Number(tieConfidence.toFixed(1)),
+            playerPairConfidence: Number(playerPairConfidence.toFixed(1)),
+            bankerPairConfidence: Number(bankerPairConfidence.toFixed(1)),
+            super6Confidence: Number(super6Confidence.toFixed(1)),
+            playerBonusConfidence: Number(playerBonusConfidence.toFixed(1)),
+            bankerBonusConfidence: Number(bankerBonusConfidence.toFixed(1)),
         };
     };
 
     // ---- Road Generators (chronological -> render left-to-right oldest->newest columns) ----
     const generateBigRoad = () => {
         // Use results directly — do NOT reverse
-        const ordered = results.filter((r) => r.winner !== "tie");
+        const ordered = results; // include ties
 
         const road: { winner: "player" | "banker"; ties: number }[][] = [];
         let currentColumn: { winner: "player" | "banker"; ties: number }[] = [];
         let lastWinner: "player" | "banker" | null = null;
 
         for (const r of ordered) {
+            if (r.winner === "tie") {
+                if (currentColumn.length > 0) {
+                    currentColumn[currentColumn.length - 1].ties++;
+                }
+                continue;
+            }
+
             const winner = r.winner as "player" | "banker";
 
             // continue streak in same column
@@ -563,16 +721,23 @@ const BaccaratRecorder: React.FC = () => {
         const isCorrectPrediction =
             predictedWinner && selectedResult !== "tie" ? predictedWinner === selectedResult : undefined;
 
+        const pScore = playerScore ? parseInt(playerScore) : undefined;
+        const bScore = bankerScore ? parseInt(bankerScore) : undefined;
+        const super6 = selectedResult === "banker" && bScore === 6 ? true : undefined;
+
         const newResult: GameResult = {
             id: Date.now().toString(),
             winner: selectedResult,
-            playerScore: playerScore ? parseInt(playerScore) : undefined,
-            bankerScore: bankerScore ? parseInt(bankerScore) : undefined,
+            playerScore: pScore,
+            bankerScore: bScore,
             timestamp: Date.now(),
             shoeNumber: currentShoe,
             dealerNumber: currentDealer,
             predictedWinner,
             isCorrectPrediction,
+            playerPair: playerPair ? true : undefined,
+            bankerPair: bankerPair ? true : undefined,
+            super6,
         };
 
         setResults((prev) => [...prev, newResult]); // store chronological as append (oldest -> newest)
@@ -580,6 +745,8 @@ const BaccaratRecorder: React.FC = () => {
         setSelectedResult(null);
         setPlayerScore("");
         setBankerScore("");
+        setPlayerPair(false);
+        setBankerPair(false);
     };
 
     const deleteResult = (id: string) => {
@@ -749,34 +916,56 @@ const BaccaratRecorder: React.FC = () => {
                                             onClick={() => setShowAdvanced(!showAdvanced)}
                                             className="text-blue-400 hover:text-blue-300 text-sm mb-2"
                                         >
-                                            {showAdvanced ? "− Hide" : "+ Show"} Optional Scores
+                                            {showAdvanced ? "− Hide" : "+ Show"} Optional Scores & Side Bets
                                         </button>
 
                                         {showAdvanced && (
-                                            <div className="grid grid-cols-2 gap-3 mt-2">
-                                                <div>
-                                                    <label className="text-slate-400 text-sm mb-1 block">Player Score</label>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        max="9"
-                                                        value={playerScore}
-                                                        onChange={(e) => setPlayerScore(e.target.value)}
-                                                        className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none"
-                                                        placeholder="0-9"
-                                                    />
+                                            <div className="space-y-3 mt-2">
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="text-slate-400 text-sm mb-1 block">Player Score</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="9"
+                                                            value={playerScore}
+                                                            onChange={(e) => setPlayerScore(e.target.value)}
+                                                            className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none"
+                                                            placeholder="0-9"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-slate-400 text-sm mb-1 block">Banker Score</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="9"
+                                                            value={bankerScore}
+                                                            onChange={(e) => setBankerScore(e.target.value)}
+                                                            className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none"
+                                                            placeholder="0-9"
+                                                        />
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <label className="text-slate-400 text-sm mb-1 block">Banker Score</label>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        max="9"
-                                                        value={bankerScore}
-                                                        onChange={(e) => setBankerScore(e.target.value)}
-                                                        className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none"
-                                                        placeholder="0-9"
-                                                    />
+                                                <div className="flex gap-4">
+                                                    <label className="flex items-center gap-2 text-slate-300 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={playerPair}
+                                                            onChange={(e) => setPlayerPair(e.target.checked)}
+                                                            className="form-checkbox bg-slate-700 border-slate-600 text-blue-500"
+                                                        />
+                                                        Player Pair
+                                                    </label>
+                                                    <label className="flex items-center gap-2 text-slate-300 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={bankerPair}
+                                                            onChange={(e) => setBankerPair(e.target.checked)}
+                                                            className="form-checkbox bg-slate-700 border-slate-600 text-red-500"
+                                                        />
+                                                        Banker Pair
+                                                    </label>
                                                 </div>
                                             </div>
                                         )}
@@ -811,6 +1000,14 @@ const BaccaratRecorder: React.FC = () => {
                                     <div className="flex justify-between">
                                         <span className="text-green-400">Tie:</span>
                                         <span className="text-white font-bold">{stats.ties} ({stats.tieRate}%)</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-400">Pairs:</span>
+                                        <span className="text-white font-bold">{stats.playerPairs + stats.bankerPairs} ({stats.pairRate}%)</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-400">Super 6:</span>
+                                        <span className="text-white font-bold">{stats.super6s} ({stats.super6Rate}%)</span>
                                     </div>
                                 </div>
                             </div>
@@ -860,7 +1057,7 @@ const BaccaratRecorder: React.FC = () => {
                                                         {column.map((cell, cellIdx) => (
                                                             <div
                                                                 key={cellIdx}
-                                                                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold ${cell.winner === "player"
+                                                                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold relative ${cell.winner === "player"
                                                                     ? "border-blue-500 text-blue-400 bg-blue-500/10"
                                                                     : "border-red-500 text-red-400 bg-red-500/10"
                                                                     }`}
@@ -876,7 +1073,7 @@ const BaccaratRecorder: React.FC = () => {
                                                 ))}
                                             </div>
                                         </div>
-                                        <p className="text-slate-400 text-xs mt-3"> Hollow circles represent wins. Columns show streaks. </p>
+                                        <p className="text-slate-400 text-xs mt-3"> Hollow circles represent wins. Columns show streaks. Green numbers indicate ties. </p>
                                     </div>
                                 )}
 
@@ -894,7 +1091,7 @@ const BaccaratRecorder: React.FC = () => {
                                                 className={`flex items-center justify-between p-3 rounded-lg border ${result.winner === "player" ? "bg-blue-900/20 border-blue-500/30" : result.winner === "banker" ? "bg-red-900/20 border-red-500/30" : "bg-green-900/20 border-green-500/30"
                                                     }`}
                                             >
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-3 flex-wrap">
                                                     <div className="text-slate-500 font-mono text-sm w-8">#{results.length - idx}</div>
                                                     <div className={`px-3 py-1 rounded font-bold text-sm ${result.winner === "player" ? "bg-blue-600 text-white" : result.winner === "banker" ? "bg-red-600 text-white" : "bg-green-600 text-white"
                                                         }`}>
@@ -910,6 +1107,14 @@ const BaccaratRecorder: React.FC = () => {
                                                     {typeof result.playerScore === "number" && typeof result.bankerScore === "number" && (
                                                         <div className="text-slate-300 text-sm">
                                                             P: {result.playerScore} - B: {result.bankerScore}
+                                                        </div>
+                                                    )}
+
+                                                    {(result.playerPair || result.bankerPair || result.super6) && (
+                                                        <div className="flex gap-2 text-sm">
+                                                            {result.playerPair && <span className="text-blue-300">P Pair</span>}
+                                                            {result.bankerPair && <span className="text-red-300">B Pair</span>}
+                                                            {result.super6 && <span className="text-purple-300">Super 6</span>}
                                                         </div>
                                                     )}
 
@@ -1079,6 +1284,34 @@ const BaccaratRecorder: React.FC = () => {
                             </div>
                             <p className="text-slate-500 text-xs mt-4">True probabilities based on 8 decks: Banker 45.86%, Player 44.62%, Tie 9.52%.</p>
                         </div>
+
+                        <div className="bg-slate-800/50 backdrop-blur rounded-lg p-6 border border-blue-500/30">
+                            <h3 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
+                                <Activity size={20} /> Side Bets Stats
+                            </h3>
+                            <div className="space-y-4">
+                                <div className="flex justify-between">
+                                    <span className="text-blue-300">Player Pairs</span>
+                                    <span className="text-white font-bold">{stats.playerPairs}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-red-300">Banker Pairs</span>
+                                    <span className="text-white font-bold">{stats.bankerPairs}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-purple-300">Super 6</span>
+                                    <span className="text-white font-bold">{stats.super6s} ({stats.super6Rate}%)</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-blue-300">Player Bonus</span>
+                                    <span className="text-white font-bold">{stats.playerBonusWins} ({stats.playerBonusRate}%)</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-red-300">Banker Bonus</span>
+                                    <span className="text-white font-bold">{stats.bankerBonusWins} ({stats.bankerBonusRate}%)</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -1099,11 +1332,17 @@ const BaccaratRecorder: React.FC = () => {
                                                         {column.map((cell, cellIdx) => (
                                                             <div
                                                                 key={cellIdx}
-                                                                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all hover:scale-110 ${cell.winner === "player"
+                                                                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold relative transition-all hover:scale-110 ${cell.winner === "player"
                                                                     ? "border-blue-500 text-blue-400 bg-blue-500/10"
                                                                     : "border-red-500 text-red-400 bg-red-500/10"
                                                                     }`}
-                                                            />
+                                                            >
+                                                                {cell.ties > 0 && (
+                                                                    <span className="absolute text-xs font-mono text-green-400 -translate-x-3 translate-y-3">
+                                                                        {cell.ties}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         ))}
                                                     </div>
                                                 ))}
@@ -1112,7 +1351,7 @@ const BaccaratRecorder: React.FC = () => {
                                     ) : (
                                         <div className="bg-slate-900/80 p-8 rounded-lg text-center text-slate-500">No data yet</div>
                                     )}
-                                    <p className="text-slate-400 text-xs mt-3"> Hollow circles represent wins. Columns show streaks. </p>
+                                    <p className="text-slate-400 text-xs mt-3"> Hollow circles represent wins. Columns show streaks. Green numbers indicate ties. </p>
                                 </div>
 
                                 <div className="bg-slate-800/50 backdrop-blur rounded-lg p-6 border border-blue-500/30">
@@ -1211,7 +1450,7 @@ const BaccaratRecorder: React.FC = () => {
                                 </div>
 
                                 <div className="mt-4 bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-                                    <p className="text-blue-300 text-sm"> <strong>How to read:</strong> Derived roads help predict next outcome patterns. Red circles suggest the shoe is following a predictable pattern, while blue circles indicate more chaotic/random results. </p>
+                                    <p className="text-blue-300 text-sm"> <strong>How to read:</strong> Derived roads help predict next outcome patterns. Red circles suggest the shoe is following a predictable pattern, while blue circles indicate more chaotic/random results. Ties are incorporated in Big Road markings. </p>
                                 </div>
                             </div>
                         </div>
@@ -1223,7 +1462,7 @@ const BaccaratRecorder: React.FC = () => {
                                 </h2>
                                 {patterns.length > 0 ? (
                                     <div className="grid grid-cols-1 gap-4">
-                                        {patterns.slice(0, 3).map((p, i) => (
+                                        {patterns.map((p, i) => (
                                             <div key={i} className="bg-slate-900/50 rounded-lg p-5 border border-slate-700 hover:border-blue-500/50 transition-all">
                                                 <div className="flex items-start justify-between mb-3">
                                                     <h3 className="text-lg font-bold text-white">{p.type}</h3>
@@ -1248,11 +1487,11 @@ const BaccaratRecorder: React.FC = () => {
                                 <div className="space-y-4 text-sm">
                                     <div className="bg-slate-900/50 rounded-lg p-4">
                                         <div className="font-bold text-white mb-2">Big Road</div>
-                                        <p className="text-slate-400 mb-3">The primary pattern display showing actual game results in columns (streaks).</p>
+                                        <p className="text-slate-400 mb-3">The primary pattern display showing actual game results in columns (streaks). Ties marked as green numbers.</p>
                                     </div>
                                     <div className="bg-slate-900/50 rounded-lg p-4">
                                         <div className="font-bold text-white mb-2">Bead Plate</div>
-                                        <p className="text-slate-400 mb-3">Shows all results in chronological order, reading top to bottom, left to right.</p>
+                                        <p className="text-slate-400 mb-3">Shows all results in chronological order, reading top to bottom, left to right. Green for ties.</p>
                                     </div>
                                     <div className="border-t border-slate-700 pt-4">
                                         <div className="font-bold text-white mb-1">Derived Roads (B.E.B, Small, Cockroach)</div>
@@ -1279,6 +1518,10 @@ const BaccaratRecorder: React.FC = () => {
                                 <div className="flex items-center gap-3">
                                     <div className="text-slate-400">Confidence:</div>
                                     <div className="text-3xl font-bold text-yellow-400">{prediction.confidence}%</div>
+                                </div>
+                                <div className="mt-4">
+                                    <div className="text-slate-400 text-sm mb-2">Tie Possibility:</div>
+                                    <div className="text-2xl font-bold text-green-400">{prediction.tieConfidence}%</div>
                                 </div>
                             </div>
 
@@ -1350,6 +1593,34 @@ const BaccaratRecorder: React.FC = () => {
                                     </div>
                                 )}
                             </div>
+
+                            <div className="md:col-span-2 bg-slate-800/50 backdrop-blur rounded-lg p-6 border border-blue-500/30">
+                                <h3 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
+                                    <Target size={20} /> Side Bets Predictions
+                                </h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <span className="text-slate-400 block mb-2">Player Pair</span>
+                                        <div className="text-2xl font-bold text-blue-400">{prediction.playerPairConfidence}%</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 block mb-2">Banker Pair</span>
+                                        <div className="text-2xl font-bold text-red-400">{prediction.bankerPairConfidence}%</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 block mb-2">Super 6</span>
+                                        <div className="text-2xl font-bold text-purple-400">{prediction.super6Confidence}%</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 block mb-2">Player Bonus</span>
+                                        <div className="text-2xl font-bold text-blue-400">{prediction.playerBonusConfidence}%</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 block mb-2">Banker Bonus</span>
+                                        <div className="text-2xl font-bold text-red-400">{prediction.bankerBonusConfidence}%</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="lg:col-span-1 space-y-6">
@@ -1390,10 +1661,11 @@ const BaccaratRecorder: React.FC = () => {
                                         <li className="flex items-start gap-2"><span className="text-blue-400">•</span><span>Current streak analysis and reversal anticipation</span></li>
                                         <li className="flex items-start gap-2"><span className="text-blue-400">•</span><span>Double and repeating patterns</span></li>
                                         <li className="flex items-start gap-2"><span className="text-blue-400">•</span><span>Statistical probability baselines</span></li>
+                                        <li className="flex items-start gap-2"><span className="text-blue-400">•</span><span>Tie, pair, super6, and bonus patterns</span></li>
                                     </ul>
                                     <div className="pt-2 border-t border-slate-700">
                                         <p className="font-bold text-yellow-400 mb-1">Pattern Prediction Logic:</p>
-                                        <p className="text-xs">Based on detected patterns, the AI generates a 6-hand forecast showing the most likely sequence of outcomes.</p>
+                                        <p className="text-xs">Based on detected patterns, the AI generates a 6-hand forecast showing the most likely sequence of outcomes, including potential side bets.</p>
                                     </div>
                                     <p className="pt-2 border-t border-slate-700">Remember: Baccarat outcomes are random. Predictions are for entertainment and tracking purposes only.</p>
                                 </div>
